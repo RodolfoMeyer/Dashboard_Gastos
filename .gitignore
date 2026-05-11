@@ -1,0 +1,13 @@
+# Respaldos con datos (no subir a remoto público)
+**/respaldo_toled_*.json
+
+# Exportes / volcados locales
+**/*RAW*.txt
+
+# Artefactos comprimidos (opcional; quita esta línea si quieres versionar .zip)
+*.zip
+
+# SO / IDE
+Thumbs.db
+.DS_Store
+*.log
