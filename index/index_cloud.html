@@ -5501,6 +5501,12 @@
     function initSupabase() {
       if (!_sbConfigured || typeof supabase === 'undefined') return;
       _sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      _sb.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          showLoginOverlay(true);
+          showAuthView('reset');
+        }
+      });
     }
 
     async function supabaseLogin(email, password) {
@@ -5518,13 +5524,13 @@
     async function handleLoginSubmit() {
       const email = document.getElementById('loginEmail').value.trim();
       const pass  = document.getElementById('loginPass').value.trim();
-      const errEl = document.getElementById('loginError');
+      const msg   = document.getElementById('authMsg');
       const btn   = document.getElementById('loginBtn');
-      if (!email || !pass) { errEl.textContent = 'Completa email y contraseña'; return; }
-      btn.disabled = true; btn.textContent = 'Conectando...'; errEl.textContent = '';
+      if (!email || !pass) { msg.style.color='#f87171'; msg.textContent='Completa email y contraseña'; return; }
+      btn.disabled = true; btn.textContent = 'Conectando...'; msg.textContent = '';
       const { data, error } = await supabaseLogin(email, pass);
       if (error) {
-        errEl.textContent = error.message;
+        msg.style.color = '#f87171'; msg.textContent = error.message;
         btn.disabled = false; btn.textContent = 'Ingresar'; return;
       }
       _currentUser = data.user;
@@ -5556,7 +5562,97 @@
       if (_sb) await _sb.auth.signOut();
       _currentUser = null; _cloudRestored = false;
       showLoginOverlay(true);
+      showAuthView('login');
       showToast('Sesión cerrada');
+    }
+
+    function showAuthView(view) {
+      ['login','register','forgot','reset'].forEach(v => {
+        const el = document.getElementById('view' + v.charAt(0).toUpperCase() + v.slice(1));
+        if (el) el.style.display = (v === view) ? 'block' : 'none';
+      });
+      const tabs = document.getElementById('authTabs');
+      if (tabs) tabs.style.display = (view === 'forgot' || view === 'reset') ? 'none' : 'flex';
+      ['login','register'].forEach(t => {
+        const tab = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (tab) {
+          tab.style.borderBottom = (t === view) ? '2px solid #f1c40f' : '2px solid transparent';
+          tab.style.color = (t === view) ? '#f1c40f' : '#64748b';
+        }
+      });
+      const msg = document.getElementById('authMsg');
+      if (msg) msg.textContent = '';
+    }
+
+    async function handleRegisterSubmit() {
+      const nombre = document.getElementById('regNombre').value.trim();
+      const email  = document.getElementById('regEmail').value.trim();
+      const pass   = document.getElementById('regPass').value;
+      const pass2  = document.getElementById('regPass2').value;
+      const msg    = document.getElementById('authMsg');
+      const btn    = document.getElementById('regBtn');
+      msg.textContent = '';
+      if (!nombre || !email || !pass) { msg.style.color='#f87171'; msg.textContent='Completa todos los campos'; return; }
+      if (pass.length < 6) { msg.style.color='#f87171'; msg.textContent='La contraseña debe tener al menos 6 caracteres'; return; }
+      if (pass !== pass2) { msg.style.color='#f87171'; msg.textContent='Las contraseñas no coinciden'; return; }
+      btn.disabled = true; btn.textContent = 'Creando cuenta...';
+      const { data, error } = await _sb.auth.signUp({
+        email, password: pass,
+        options: { data: { nombre } }
+      });
+      btn.disabled = false; btn.textContent = 'Crear cuenta';
+      if (error) { msg.style.color='#f87171'; msg.textContent = error.message; return; }
+      if (data?.session) {
+        _currentUser = data.user;
+        showLoginOverlay(false);
+        await xlRestoreCloud();
+        renderDashboard();
+        xlShowSavedIndicator('☁ Bienvenido al dashboard');
+      } else {
+        msg.style.color='#4ade80';
+        msg.textContent='✓ Cuenta creada. Revisa tu email para confirmar.';
+      }
+    }
+
+    async function handleForgotSubmit() {
+      const email = document.getElementById('forgotEmail').value.trim();
+      const msg   = document.getElementById('authMsg');
+      const btn   = document.getElementById('forgotBtn');
+      if (!email) { msg.style.color='#f87171'; msg.textContent='Ingresa tu email'; return; }
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      const { error } = await _sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href.split('#')[0]
+      });
+      btn.disabled = false; btn.textContent = 'Enviar enlace';
+      if (error) { msg.style.color='#f87171'; msg.textContent = error.message; return; }
+      msg.style.color='#4ade80';
+      msg.textContent='✓ Enlace enviado. Revisa tu email.';
+    }
+
+    async function handlePasswordResetSubmit() {
+      const pass  = document.getElementById('resetPass').value;
+      const pass2 = document.getElementById('resetPass2').value;
+      const msg   = document.getElementById('authMsg');
+      const btn   = document.getElementById('resetBtn');
+      if (pass.length < 6) { msg.style.color='#f87171'; msg.textContent='La contraseña debe tener al menos 6 caracteres'; return; }
+      if (pass !== pass2) { msg.style.color='#f87171'; msg.textContent='Las contraseñas no coinciden'; return; }
+      btn.disabled = true; btn.textContent = 'Guardando...';
+      const { error } = await _sb.auth.updateUser({ password: pass });
+      btn.disabled = false; btn.textContent = 'Guardar contraseña';
+      if (error) { msg.style.color='#f87171'; msg.textContent = error.message; return; }
+      msg.style.color='#4ade80';
+      msg.textContent='✓ Contraseña actualizada. Iniciando sesión...';
+      setTimeout(async () => {
+        const { data: { session } } = await _sb.auth.getSession();
+        if (session?.user) {
+          _currentUser = session.user;
+          showLoginOverlay(false);
+          await xlRestoreCloud();
+          renderDashboard();
+        } else {
+          showAuthView('login');
+        }
+      }, 1500);
     }
 
     // ── Cloud Restore ────────────────────────────────────
@@ -6696,22 +6792,106 @@
 
   <!-- ── LOGIN OVERLAY (cloud mode) ── -->
   <div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.88);align-items:center;justify-content:center;backdrop-filter:blur(6px)">
-    <div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:16px;padding:44px 36px;width:100%;max-width:360px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
-      <div style="font-size:30px;margin-bottom:6px">🔐</div>
-      <div style="font-size:21px;font-weight:700;color:#f1c40f;margin-bottom:4px">TOLED Dashboard</div>
-      <div style="font-size:12px;color:#64748b;margin-bottom:28px">Operaciones · La Negra</div>
-      <input id="loginEmail" type="email" placeholder="Email"
-        style="width:100%;padding:12px 14px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:14px;margin-bottom:10px;outline:none;box-sizing:border-box"
-        onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'">
-      <input id="loginPass" type="password" placeholder="Contraseña"
-        style="width:100%;padding:12px 14px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:14px;margin-bottom:18px;outline:none;box-sizing:border-box"
-        onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'"
-        onkeydown="if(event.key==='Enter')handleLoginSubmit()">
-      <button id="loginBtn" onclick="handleLoginSubmit()"
-        style="width:100%;padding:13px;background:#f1c40f;color:#0f1117;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px">
-        Ingresar
-      </button>
-      <div id="loginError" style="margin-top:12px;font-size:12px;color:#f87171;min-height:18px"></div>
+    <div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:16px;padding:32px 28px;width:100%;max-width:380px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+      <div style="font-size:26px;margin-bottom:4px">🔐</div>
+      <div style="font-size:19px;font-weight:700;color:#f1c40f;margin-bottom:2px">TOLED Dashboard</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:18px">Operaciones · La Negra</div>
+
+      <!-- Tabs -->
+      <div id="authTabs" style="display:flex;border-bottom:1px solid #2d3748;margin-bottom:20px">
+        <button id="tabLogin" onclick="showAuthView('login')"
+          style="flex:1;padding:8px 0;background:none;border:none;border-bottom:2px solid #f1c40f;color:#f1c40f;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.5px">
+          INGRESAR
+        </button>
+        <button id="tabRegister" onclick="showAuthView('register')"
+          style="flex:1;padding:8px 0;background:none;border:none;border-bottom:2px solid transparent;color:#64748b;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.5px">
+          CREAR CUENTA
+        </button>
+      </div>
+
+      <!-- VIEW: Login -->
+      <div id="viewLogin">
+        <input id="loginEmail" type="email" placeholder="Email"
+          style="width:100%;padding:11px 12px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:9px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'">
+        <input id="loginPass" type="password" placeholder="Contraseña"
+          style="width:100%;padding:11px 12px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:15px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'"
+          onkeydown="if(event.key==='Enter')handleLoginSubmit()">
+        <button id="loginBtn" onclick="handleLoginSubmit()"
+          style="width:100%;padding:12px;background:#f1c40f;color:#0f1117;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+          Ingresar
+        </button>
+        <div style="margin-top:11px">
+          <span onclick="showAuthView('forgot')"
+            style="font-size:11px;color:#64748b;cursor:pointer;text-decoration:underline">
+            ¿Olvidaste tu contraseña?
+          </span>
+        </div>
+      </div>
+
+      <!-- VIEW: Crear cuenta -->
+      <div id="viewRegister" style="display:none">
+        <input id="regNombre" type="text" placeholder="Nombre completo"
+          style="width:100%;padding:11px 12px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:9px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'">
+        <input id="regEmail" type="email" placeholder="Email"
+          style="width:100%;padding:11px 12px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:9px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'">
+        <input id="regPass" type="password" placeholder="Contraseña (mín. 6 caracteres)"
+          style="width:100%;padding:11px 12px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:9px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'">
+        <input id="regPass2" type="password" placeholder="Confirmar contraseña"
+          style="width:100%;padding:11px 12px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:15px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'"
+          onkeydown="if(event.key==='Enter')handleRegisterSubmit()">
+        <button id="regBtn" onclick="handleRegisterSubmit()"
+          style="width:100%;padding:12px;background:#f1c40f;color:#0f1117;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+          Crear cuenta
+        </button>
+      </div>
+
+      <!-- VIEW: Recuperar contraseña -->
+      <div id="viewForgot" style="display:none">
+        <div style="text-align:left;font-size:12px;color:#94a3b8;margin-bottom:14px;line-height:1.5">
+          Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.
+        </div>
+        <input id="forgotEmail" type="email" placeholder="Email"
+          style="width:100%;padding:11px 12px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:15px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'"
+          onkeydown="if(event.key==='Enter')handleForgotSubmit()">
+        <button id="forgotBtn" onclick="handleForgotSubmit()"
+          style="width:100%;padding:12px;background:#f1c40f;color:#0f1117;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+          Enviar enlace
+        </button>
+        <div style="margin-top:11px">
+          <span onclick="showAuthView('login')"
+            style="font-size:11px;color:#64748b;cursor:pointer;text-decoration:underline">
+            ← Volver al inicio
+          </span>
+        </div>
+      </div>
+
+      <!-- VIEW: Nueva contraseña (activada por link de email) -->
+      <div id="viewReset" style="display:none">
+        <div style="text-align:left;font-size:12px;color:#94a3b8;margin-bottom:14px;line-height:1.5">
+          Elige una nueva contraseña para tu cuenta.
+        </div>
+        <input id="resetPass" type="password" placeholder="Nueva contraseña"
+          style="width:100%;padding:11px 12px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:9px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'">
+        <input id="resetPass2" type="password" placeholder="Confirmar nueva contraseña"
+          style="width:100%;padding:11px 12px;background:#0f1117;border:1px solid #2d3748;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:15px;outline:none;box-sizing:border-box"
+          onfocus="this.style.borderColor='#f1c40f'" onblur="this.style.borderColor='#2d3748'"
+          onkeydown="if(event.key==='Enter')handlePasswordResetSubmit()">
+        <button id="resetBtn" onclick="handlePasswordResetSubmit()"
+          style="width:100%;padding:12px;background:#f1c40f;color:#0f1117;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+          Guardar contraseña
+        </button>
+      </div>
+
+      <!-- Mensaje compartido error / éxito -->
+      <div id="authMsg" style="margin-top:12px;font-size:12px;min-height:18px"></div>
     </div>
   </div>
 
