@@ -1264,6 +1264,11 @@
       outline-offset: -1px;
       z-index: 5;
     }
+    /* ── COPY/PASTE RANGE SELECTION ── */
+    .xl-range-sel { background: rgba(91,140,220,.18) !important; }
+    .xl-range-sel .xl-cell { background: transparent !important; }
+    @keyframes xl-flash { 0%{background:rgba(91,140,220,.55)} 100%{background:rgba(91,140,220,.18)} }
+    .xl-copy-flash { animation: xl-flash .5s ease; }
 
     /* TOTAL ROW */
     .xl-grid tfoot tr td {
@@ -4268,6 +4273,14 @@
       document.querySelectorAll('.xl-focused').forEach(el => el.classList.remove('xl-focused'));
       inp.closest('td').classList.add('xl-focused');
       
+      // ── range selection tracking ──
+      if (_xlShiftHeld && xlCellRange) {
+        xlCellRange.r2 = ri; xlCellRange.c2 = ci;
+      } else {
+        xlCellRange = { r1: ri, c1: ci, r2: ri, c2: ci };
+      }
+      xlHighlightRange();
+      
       // Asegurar que el cursor esté disponible
       inp.classList.add('editing');
     }
@@ -4389,6 +4402,103 @@
       }
     }
 
+    // ── COPY / PASTE — MODO EXCEL ────────────────────────────
+    let xlCellRange = null; // { r1, c1, r2, c2 }
+    let _xlShiftHeld = false;
+    document.addEventListener('mousedown', e => { _xlShiftHeld = e.shiftKey; });
+    document.addEventListener('mouseup',   () => { _xlShiftHeld = false; });
+
+    function xlGetRangeNorm() {
+      if (!xlCellRange) return null;
+      return {
+        r1: Math.min(xlCellRange.r1, xlCellRange.r2),
+        c1: Math.min(xlCellRange.c1, xlCellRange.c2),
+        r2: Math.max(xlCellRange.r1, xlCellRange.r2),
+        c2: Math.max(xlCellRange.c1, xlCellRange.c2),
+      };
+    }
+
+    function xlHighlightRange() {
+      const rng = xlGetRangeNorm();
+      document.querySelectorAll('#xlBody td').forEach(td => {
+        const inp = td.querySelector('[data-row]');
+        if (!inp) return;
+        const r = +inp.dataset.row, c = +inp.dataset.col;
+        if (rng && r >= rng.r1 && r <= rng.r2 && c >= rng.c1 && c <= rng.c2) {
+          td.classList.add('xl-range-sel');
+        } else {
+          td.classList.remove('xl-range-sel');
+        }
+      });
+    }
+
+    function xlCopySelection() {
+      const rng = xlGetRangeNorm();
+      if (!rng) return;
+      const rows = xlData[xlMesActivo] || [];
+      const lines = [];
+      for (let r = rng.r1; r <= rng.r2; r++) {
+        const row = rows[r]; if (!row) continue;
+        const cells = [];
+        for (let c = rng.c1; c <= rng.c2; c++) {
+          const col = XL_COLS[c];
+          const val = (row[col.key] !== undefined && row[col.key] !== null) ? row[col.key] : '';
+          cells.push(String(val));
+        }
+        lines.push(cells.join('\t'));
+      }
+      navigator.clipboard.writeText(lines.join('\r\n')).then(() => {
+        const nR = rng.r2 - rng.r1 + 1, nC = rng.c2 - rng.c1 + 1;
+        showToast('Copiado: ' + nR + ' fila(s) x ' + nC + ' col(s)');
+        document.querySelectorAll('#xlBody .xl-range-sel').forEach(td => {
+          td.classList.add('xl-copy-flash');
+          setTimeout(() => td.classList.remove('xl-copy-flash'), 500);
+        });
+      }).catch(() => showToast('No se pudo copiar al portapapeles'));
+    }
+
+    function xlPasteText(text) {
+      const rng = xlGetRangeNorm();
+      const startR = rng ? rng.r1 : (xlFocused ? xlFocused.row : 0);
+      const startC = rng ? rng.c1 : (xlFocused ? xlFocused.col : 0);
+      const pasteLines = text.replace(/\r/g, '').split('\n');
+      if (pasteLines.length && pasteLines[pasteLines.length - 1].trim() === '') pasteLines.pop();
+      if (!pasteLines.length) return;
+      const mes = xlMesActivo;
+      pasteLines.forEach((line, ri) => {
+        const vals = line.split('\t');
+        const targetR = startR + ri;
+        while ((xlData[mes] || []).length <= targetR) xlData[mes].push(xlBlankRow());
+        const row = xlData[mes][targetR];
+        vals.forEach((v, ci) => {
+          const targetC = startC + ci;
+          if (targetC >= XL_COLS.length) return;
+          const col = XL_COLS[targetC];
+          if (col.type === 'formula') return;
+          v = v.trim();
+          if (col.type === 'number') {
+            row[col.key] = parseInt(v.replace(/[$. ,]/g, '').replace(/[^0-9-]/g, ''), 10) || 0;
+          } else {
+            row[col.key] = v;
+          }
+        });
+        xlCalcRow(row);
+      });
+      xlRenderGrid();
+      xlScheduleCloudSave(mes);
+      xlSyncDashboard(mes);
+      showToast('Pegado: ' + pasteLines.length + ' fila(s)');
+    }
+
+    // Paste event — activa cuando el foco esta dentro del grid
+    document.addEventListener('paste', function(e) {
+      const active = document.activeElement;
+      if (!active || !active.closest('#xlBody')) return;
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      if (text) xlPasteText(text);
+    });
+
     // ── KEYBOARD NAVIGATION ──────────────────────────────
     function xlKeyDown(e, ri, ci) {
       const rows = xlData[xlMesActivo].length;
@@ -4444,6 +4554,37 @@
         e.preventDefault();
         nc = nextEditable(ci, -1);
         if (nc === ci && ri > 0) { nr = ri - 1; nc = nextEditable(cols, -1); } // wrap
+
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        xlCopySelection();
+        return;
+
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        const _aRows = (xlData[xlMesActivo] || []).length;
+        if (_aRows > 0) {
+          xlCellRange = { r1: 0, c1: 0, r2: _aRows - 1, c2: XL_COLS.length - 1 };
+          xlHighlightRange();
+        }
+        return;
+
+      } else if (e.key === 'Escape') {
+        xlCellRange = { r1: ri, c1: ci, r2: ri, c2: ci };
+        xlHighlightRange();
+        return;
+
+      } else if (e.shiftKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp' ||
+                 e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        if (!xlCellRange) xlCellRange = { r1: ri, c1: ci, r2: ri, c2: ci };
+        const _sRows = (xlData[xlMesActivo] || []).length;
+        if (e.key === 'ArrowDown')  xlCellRange.r2 = Math.min(xlCellRange.r2 + 1, _sRows - 1);
+        if (e.key === 'ArrowUp')    xlCellRange.r2 = Math.max(xlCellRange.r2 - 1, 0);
+        if (e.key === 'ArrowRight') xlCellRange.c2 = Math.min(xlCellRange.c2 + 1, XL_COLS.length - 1);
+        if (e.key === 'ArrowLeft')  xlCellRange.c2 = Math.max(xlCellRange.c2 - 1, 0);
+        xlHighlightRange();
+        return;
 
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         return; // manejo nativo del browser
