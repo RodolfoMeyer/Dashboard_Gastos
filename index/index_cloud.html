@@ -4676,31 +4676,88 @@
       const rows = xlData[mes] || [];
       const label = DATA_MESES[mes]?.label || mes;
 
-      // Preparar data con fórmulas caculadas para el Excel
-      const excelData = rows.map(r => {
+      // Calcular totales igual que la planilla
+      const totals = xlCalcTotals();
+      const transf = xlTransf[mes] || 0;
+      const saldo = transf - totals.total;
+      const $ = n => xlFmt(n || 0);
+
+      // ── Fila de encabezado ──
+      const header = [
+        'Fecha', 'Nombre Evento', 'Función',
+        'Desayuno', 'Viático', 'Trasnoche', 'Total Viático',
+        'Parking', 'Combustible', 'Bodega', 'TOTAL'
+      ];
+
+      // ── Filas de datos con $ en columnas de dinero ──
+      const dataRows = rows.map(r => {
         xlCalcRow(r);
-        return {
-          'Fecha': r.fecha,
-          'Nombre Evento': r.evento,
-          'Función': r.funcion,
-          'Desayuno': r.desayuno,
-          'Viático': r.viatico,
-          'Trasnoche': r.trasnoche,
-          'Total Viático': r.totalViatico,
-          'Parking': r.parking,
-          'Combustible': r.combustible,
-          'Bodega': r.bodega,
-          'TOTAL': r.total
-        };
+        return [
+          r.fecha || '',
+          r.evento || '',
+          r.funcion || '',
+          $(r.desayuno),
+          $(r.viatico),
+          $(r.trasnoche),
+          $(r.totalViatico),
+          $(r.parking),
+          $(r.combustible),
+          $(r.bodega),
+          $(r.total)
+        ];
       });
 
-      const ws = XLSX.utils.json_to_sheet(excelData);
+      // ── Fila Σ TOTALES (igual a la fila de totales de la planilla) ──
+      const totalesRow = [
+        'Σ', 'TOTALES', '',
+        $(totals.desayuno),
+        $(totals.viatico),
+        $(totals.trasnoche),
+        $(totals.totalViatico),
+        $(totals.parking),
+        $(totals.combustible),
+        $(totals.bodega),
+        $(totals.total)
+      ];
+
+      // ── Pie de la planilla (desglose resumen) ──
+      const saldoStr = (saldo >= 0 ? '+' : '-') + xlFmt(Math.abs(saldo));
+      const footer = [
+        [],
+        ['Filas:', String(rows.length)],
+        ['Total Viático:', $(totals.totalViatico)],
+        ['Combustible:', $(totals.combustible)],
+        ['Parking:', $(totals.parking)],
+        ['Bodega:', $(totals.bodega)],
+        ['TOTAL MES:', $(totals.total)],
+        ['Transferido:', $(transf)],
+        ['Saldo:', saldoStr]
+      ];
+
+      const aoa = [header, ...dataRows, [], totalesRow, ...footer];
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Ancho de columnas
+      ws['!cols'] = [
+        { wch: 12 }, // Fecha
+        { wch: 32 }, // Nombre Evento
+        { wch: 22 }, // Función
+        { wch: 13 }, // Desayuno
+        { wch: 13 }, // Viático
+        { wch: 13 }, // Trasnoche
+        { wch: 15 }, // Total Viático
+        { wch: 12 }, // Parking
+        { wch: 14 }, // Combustible
+        { wch: 12 }, // Bodega
+        { wch: 14 }  // TOTAL
+      ];
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, label.substring(0, 31));
-      
       const fname = `PLANILLA_TOLED_${label.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('es-CL').replace(/\//g, '-')}.xlsx`;
       XLSX.writeFile(wb, fname);
-      showToast('✓ Excel exportado: ' + fname);
+      showToast('📊 Excel exportado: ' + fname);
     }
 
     // ── Descargar Plantilla Excel vacía lista para llenar e importar ──────
