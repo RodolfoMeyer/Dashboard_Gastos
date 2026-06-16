@@ -6641,13 +6641,11 @@
     initSupabase();
 
     (function () {
-      // 1. Cargar estructura base del Excel
+      // 1. Cargar estructura base del Excel (no toca el DOM)
       xlInit();
 
       if (_sbConfigured && _sb) {
-        // ── Modo Cloud: mostrar login y cargar desde Supabase ──
-        showLoginOverlay(true);
-        // Cargar datos localStorage de forma optimista (mientras carga la nube)
+        // ── Modo Cloud: cargar localStorage optimista primero ──
         const localRestored = xlRestore();
         if (localRestored) {
           MESES_ORDEN.forEach(mes => {
@@ -6664,9 +6662,13 @@
           refreshXlTransf();
         }
         renderDashboard();
-        // Verificar sesión activa (puede saltarse el login si ya estaba logueado)
-        checkAuthAndLoad();
-        setTimeout(() => { xlInjectClearBtn(); xlUpdateStorageBadge(); }, 150);
+        // Diferir acceso al DOM del overlay hasta que el HTML esté completamente parseado
+        setTimeout(() => {
+          showLoginOverlay(true);
+          checkAuthAndLoad();
+          xlInjectClearBtn();
+          xlUpdateStorageBadge();
+        }, 0);
 
       } else {
         // ── Modo Local: comportamiento original con localStorage ──
