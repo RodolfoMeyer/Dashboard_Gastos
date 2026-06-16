@@ -4731,14 +4731,8 @@
       const saldoStr = (saldo >= 0 ? '+' : '-') + xlFmt(Math.abs(saldo));
       const footerRows = [
         [],
-        ['Filas:', String(rows.length)],
-        ['Total Viático:', $f(totals.totalViatico)],
-        ['Combustible:', $f(totals.combustible)],
-        ['Parking:', $f(totals.parking)],
-        ['Bodega:', $f(totals.bodega)],
-        ['TOTAL MES:', $f(totals.total)],
-        ['Transferido:', $f(transf)],
-        ['Saldo:', saldoStr]
+        ['Filas:', rows.length, 'Total Viático:', $f(totals.totalViatico), 'Combustible:', $f(totals.combustible), 'Parking:', $f(totals.parking), 'Bodega:', $f(totals.bodega), 'TOTAL MES:', $f(totals.total)],
+        ['Transferido:', $f(transf), 'Saldo:', saldoStr]
       ];
 
       const aoa = [grupoRow, headerRow, ...dataRows, [], totalesRow, ...footerRows];
