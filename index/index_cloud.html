@@ -1471,10 +1471,86 @@
     #confirmModal .cm-ok { padding: 8px 18px; border-radius: 8px; border: none; background: var(--danger, #c0392b); color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
     #confirmModal .cm-ok.safe { background: var(--accent); color: #111; }
 
+    /* ── HAMBURGER BUTTON (solo mobile) ── */
+    #mobileMenuBtn {
+      display: none;
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 210;
+      width: 42px;
+      height: 42px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 20px;
+      color: var(--text);
+      box-shadow: 0 2px 10px rgba(0,0,0,.35);
+    }
+    #mobOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 199;
+      background: rgba(0,0,0,.55);
+    }
+    #mobOverlay.open { display: block; }
+
+    /* ── RESPONSIVE MOBILE (≤767px) ── */
+    @media (max-width: 767px) {
+      body { overflow-x: hidden; }
+
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform .28s cubic-bezier(.4,0,.2,1);
+        z-index: 200;
+        width: 280px;
+        overflow-y: auto;
+      }
+      .sidebar.mob-open {
+        transform: translateX(0);
+        box-shadow: 4px 0 28px rgba(0,0,0,.55);
+      }
+
+      /* Avatar compacto en mobile */
+      .avatar { height: 90px !important; font-size: 30px !important; }
+      .profile-card { margin: 8px 8px 8px !important; padding: 10px 10px 10px !important; }
+      .brand { padding: 0 16px 16px !important; }
+
+      #mobileMenuBtn { display: flex !important; }
+
+      .main {
+        margin-left: 0 !important;
+        padding: 64px 14px 20px !important; /* 64px deja espacio al botón hamburger */
+      }
+
+      .topbar { flex-wrap: wrap; gap: 8px; }
+      .topbar-right { flex-wrap: wrap; gap: 6px; }
+      .page-title { font-size: 18px !important; }
+
+      .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+      .grid-2 { grid-template-columns: 1fr !important; }
+      .grid-3 { grid-template-columns: 1fr !important; }
+
+      /* Tabla planilla: scroll horizontal */
+      .xl-table-wrap, .xl-grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+      /* Cloud/save indicators: moverlos para no chocar con hamburger */
+      #xlCloudInd { left: 14px !important; bottom: 62px !important; }
+      #xlSavedInd { left: 14px !important; bottom: 24px !important; }
+    }
+
     </style>
 </head>
 
 <body>
+
+  <!-- MOBILE: hamburger + overlay -->
+  <button id="mobileMenuBtn" onclick="toggleMobileSidebar()" aria-label="Menú">☰</button>
+  <div id="mobOverlay" onclick="toggleMobileSidebar()"></div>
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
@@ -3569,6 +3645,7 @@
     };
 
     function openModal(tipo) {
+      if (window.innerWidth <= 767) closeMobileSidebar();
       populateMesSelects();
       if (tipo === 'gasto') {
         document.getElementById('g_fecha').value = new Date().toISOString().split('T')[0];
@@ -6316,6 +6393,20 @@
     }
 
     // ═══════════════════════════════════════════════════
+    // ── Mobile sidebar toggle ──
+    function toggleMobileSidebar() {
+      const sb = document.querySelector('.sidebar');
+      const ov = document.getElementById('mobOverlay');
+      const open = sb.classList.toggle('mob-open');
+      if (ov) ov.classList.toggle('open', open);
+    }
+    function closeMobileSidebar() {
+      const sb = document.querySelector('.sidebar');
+      const ov = document.getElementById('mobOverlay');
+      if (sb) sb.classList.remove('mob-open');
+      if (ov) ov.classList.remove('open');
+    }
+
     //  showView — versión final con planilla
     // ═══════════════════════════════════════════════════
     function showView(v) {
@@ -6344,6 +6435,7 @@
         el.classList.toggle('active', active);
       });
       window.scrollTo(0, 0);
+      if (window.innerWidth <= 767) closeMobileSidebar();
       if (v === 'dashboard') renderDashboard();
       else if (v === 'detalle') renderDetalle();
       else if (v === 'saldos') renderSaldos();
