@@ -4668,84 +4668,95 @@
 
     // ── EXPORT EXCEL ──
     function xlExportExcel() {
-      if (typeof XLSX === 'undefined') {
-        showToast('⚠ Librería Excel no cargada');
-        return;
-      }
+      if (typeof XLSX === 'undefined') { showToast('⚠ Librería Excel no cargada'); return; }
+
       const mes = xlMesActivo;
       const rows = xlData[mes] || [];
       const label = DATA_MESES[mes]?.label || mes;
-
-      // Calcular totales igual que la planilla
       const totals = xlCalcTotals();
       const transf = xlTransf[mes] || 0;
       const saldo = transf - totals.total;
-      const $ = n => xlFmt(n || 0);
+      const $f = n => xlFmt(n || 0);
 
-      // ── Fila de encabezado ──
-      const header = [
-        'Fecha', 'Nombre Evento', 'Función',
+      // ── Fila 1: grupos de columnas (igual al header de la planilla) ──
+      const grupoRow = [
+        '', '', '', '',
+        'GASTOS VIÁTICO', '', '', '',
+        'OTROS GASTOS', '', '',
+        'TOTALES'
+      ];
+
+      // ── Fila 2: nombres de columnas ──
+      const headerRow = [
+        '#', 'Fecha', 'Nombre Evento', 'Función',
         'Desayuno', 'Viático', 'Trasnoche', 'Total Viático',
         'Parking', 'Combustible', 'Bodega', 'TOTAL'
       ];
 
-      // ── Filas de datos con $ en columnas de dinero ──
-      const dataRows = rows.map(r => {
+      // ── Filas de datos ──
+      const dataRows = rows.map((r, idx) => {
         xlCalcRow(r);
         return [
+          idx + 1,
           r.fecha || '',
           r.evento || '',
           r.funcion || '',
-          $(r.desayuno),
-          $(r.viatico),
-          $(r.trasnoche),
-          $(r.totalViatico),
-          $(r.parking),
-          $(r.combustible),
-          $(r.bodega),
-          $(r.total)
+          r.desayuno || 0,
+          r.viatico || 0,
+          r.trasnoche || 0,
+          $f(r.totalViatico),
+          r.parking || 0,
+          r.combustible || 0,
+          r.bodega || 0,
+          $f(r.total)
         ];
       });
 
-      // ── Fila Σ TOTALES (igual a la fila de totales de la planilla) ──
+      // ── Fila Σ TOTALES ──
       const totalesRow = [
-        'Σ', 'TOTALES', '',
-        $(totals.desayuno),
-        $(totals.viatico),
-        $(totals.trasnoche),
-        $(totals.totalViatico),
-        $(totals.parking),
-        $(totals.combustible),
-        $(totals.bodega),
-        $(totals.total)
+        'Σ', 'TOTALES', '', '',
+        $f(totals.desayuno),
+        $f(totals.viatico),
+        $f(totals.trasnoche),
+        $f(totals.totalViatico),
+        $f(totals.parking),
+        $f(totals.combustible),
+        $f(totals.bodega),
+        $f(totals.total)
       ];
 
-      // ── Pie de la planilla (desglose resumen) ──
+      // ── Pie (status bar) ──
       const saldoStr = (saldo >= 0 ? '+' : '-') + xlFmt(Math.abs(saldo));
-      const footer = [
+      const footerRows = [
         [],
         ['Filas:', String(rows.length)],
-        ['Total Viático:', $(totals.totalViatico)],
-        ['Combustible:', $(totals.combustible)],
-        ['Parking:', $(totals.parking)],
-        ['Bodega:', $(totals.bodega)],
-        ['TOTAL MES:', $(totals.total)],
-        ['Transferido:', $(transf)],
+        ['Total Viático:', $f(totals.totalViatico)],
+        ['Combustible:', $f(totals.combustible)],
+        ['Parking:', $f(totals.parking)],
+        ['Bodega:', $f(totals.bodega)],
+        ['TOTAL MES:', $f(totals.total)],
+        ['Transferido:', $f(transf)],
         ['Saldo:', saldoStr]
       ];
 
-      const aoa = [header, ...dataRows, [], totalesRow, ...footer];
-
+      const aoa = [grupoRow, headerRow, ...dataRows, [], totalesRow, ...footerRows];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Celdas combinadas para grupos del header
+      ws['!merges'] = [
+        { s: { r: 0, c: 4 }, e: { r: 0, c: 7 } },  // GASTOS VIÁTICO: E1:H1
+        { s: { r: 0, c: 8 }, e: { r: 0, c: 10 } },  // OTROS GASTOS: I1:K1
+      ];
 
       // Ancho de columnas
       ws['!cols'] = [
+        { wch:  4 }, // #
         { wch: 12 }, // Fecha
         { wch: 32 }, // Nombre Evento
         { wch: 22 }, // Función
-        { wch: 13 }, // Desayuno
-        { wch: 13 }, // Viático
-        { wch: 13 }, // Trasnoche
+        { wch: 12 }, // Desayuno
+        { wch: 12 }, // Viático
+        { wch: 12 }, // Trasnoche
         { wch: 15 }, // Total Viático
         { wch: 12 }, // Parking
         { wch: 14 }, // Combustible
@@ -4757,7 +4768,7 @@
       XLSX.utils.book_append_sheet(wb, ws, label.substring(0, 31));
       const fname = `PLANILLA_TOLED_${label.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('es-CL').replace(/\//g, '-')}.xlsx`;
       XLSX.writeFile(wb, fname);
-      showToast('📊 Excel exportado: ' + fname);
+      showToast('\U0001f4ca Excel exportado: ' + fname);
     }
 
     // ── Descargar Plantilla Excel vacía lista para llenar e importar ──────
