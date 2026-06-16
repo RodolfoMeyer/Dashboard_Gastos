@@ -4273,12 +4273,9 @@
       document.querySelectorAll('.xl-focused').forEach(el => el.classList.remove('xl-focused'));
       inp.closest('td').classList.add('xl-focused');
       
-      // ── range selection tracking ──
-      if (_xlShiftHeld && xlCellRange) {
-        xlCellRange.r2 = ri; xlCellRange.c2 = ci;
-      } else {
-        xlCellRange = { r1: ri, c1: ci, r2: ri, c2: ci };
-      }
+      // Reset range to single cell on normal focus
+      // Shift+click extension is handled by mousedown delegation on #xlBody
+      xlCellRange = { r1: ri, c1: ci, r2: ri, c2: ci };
       xlHighlightRange();
       
       // Asegurar que el cursor esté disponible
@@ -4404,9 +4401,7 @@
 
     // ── COPY / PASTE — MODO EXCEL ────────────────────────────
     let xlCellRange = null; // { r1, c1, r2, c2 }
-    let _xlShiftHeld = false;
-    document.addEventListener('mousedown', e => { _xlShiftHeld = e.shiftKey; });
-    document.addEventListener('mouseup',   () => { _xlShiftHeld = false; });
+    // shift+click handled via mousedown delegation on #xlBody (see below)
 
     function xlGetRangeNorm() {
       if (!xlCellRange) return null;
@@ -4431,6 +4426,31 @@
         }
       });
     }
+
+    // Shift+click: extend range without moving focus
+    document.addEventListener('mousedown', function(e) {
+      if (!e.shiftKey) return;
+      const inp = e.target.closest('.xl-cell[data-row]');
+      if (!inp || inp.readOnly) return;
+      const ri = +inp.dataset.row, ci = +inp.dataset.col;
+      if (!xlCellRange) xlCellRange = { r1: ri, c1: ci, r2: ri, c2: ci };
+      xlCellRange.r2 = ri; xlCellRange.c2 = ci;
+      xlHighlightRange();
+      e.preventDefault(); // no mover foco en shift+click
+    }, true);
+
+    // Click en numero de fila: selecciona toda la fila
+    document.addEventListener('mousedown', function(e) {
+      const th = e.target.closest('#xlBody .xl-row-num');
+      if (!th) return;
+      const tr = th.closest('tr[data-row]');
+      if (!tr) return;
+      const ri = +tr.dataset.row;
+      const start = e.shiftKey && xlCellRange ? xlCellRange.r1 : ri;
+      xlCellRange = { r1: start, c1: 0, r2: ri, c2: XL_COLS.length - 1 };
+      xlHighlightRange();
+      e.preventDefault();
+    }, true);
 
     function xlCopySelection() {
       const rng = xlGetRangeNorm();
@@ -4530,15 +4550,15 @@
         nr = e.shiftKey ? ri - 1 : ri + 1;
         if (nr >= rows) { xlAddRow(); nr = rows; }
 
-      } else if (e.key === 'ArrowDown') {
+      } else if (!e.shiftKey && e.key === 'ArrowDown') {
         e.preventDefault();
         nr = Math.min(ri + 1, rows - 1);
 
-      } else if (e.key === 'ArrowUp') {
+      } else if (!e.shiftKey && e.key === 'ArrowUp') {
         e.preventDefault();
         nr = Math.max(ri - 1, 0);
 
-      } else if (e.key === 'ArrowRight') {
+      } else if (!e.shiftKey && e.key === 'ArrowRight') {
         // Navega solo cuando el cursor está al final del texto (o campo numérico)
         const inp = e.currentTarget;
         const atEnd = inp.selectionStart === inp.value.length;
@@ -4547,7 +4567,7 @@
         nc = nextEditable(ci, 1);
         if (nc === ci && ri < rows - 1) { nr = ri + 1; nc = nextEditable(-1, 1); } // wrap
 
-      } else if (e.key === 'ArrowLeft') {
+      } else if (!e.shiftKey && e.key === 'ArrowLeft') {
         const inp = e.currentTarget;
         const atStart = inp.selectionStart === 0;
         if (!atStart) return;
