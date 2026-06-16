@@ -5509,6 +5509,13 @@
           showAuthView('reset');
         }
       });
+      // Respaldo: si tras 1.5s el overlay sigue oculto y no hay sesión, forzar login
+      setTimeout(() => {
+        if (!_currentUser) {
+          const el = document.getElementById('loginOverlay');
+          if (el && el.style.display !== 'flex') showLoginOverlay(true);
+        }
+      }, 1500);
     }
 
     async function supabaseLogin(email, password) {
@@ -5545,17 +5552,23 @@
     }
 
     async function checkAuthAndLoad() {
-      if (!_sb) return;
-      const { data: { session } } = await _sb.auth.getSession();
-      if (session?.user) {
-        _currentUser = session.user;
-        showLoginOverlay(false);
-        await xlRestoreCloud();
-        renderDashboard();
-        if (typeof xlRenderTabs === 'function') xlRenderTabs();
-        if (typeof xlRenderGrid === 'function') xlRenderGrid();
-        xlShowSavedIndicator('☁ Datos cargados desde la nube');
-      } else {
+      if (!_sb) { showLoginOverlay(true); return; }
+      try {
+        const { data: { session }, error } = await _sb.auth.getSession();
+        if (error) throw error;
+        if (session?.user) {
+          _currentUser = session.user;
+          showLoginOverlay(false);
+          await xlRestoreCloud();
+          renderDashboard();
+          if (typeof xlRenderTabs === 'function') xlRenderTabs();
+          if (typeof xlRenderGrid === 'function') xlRenderGrid();
+          xlShowSavedIndicator('☁ Datos cargados desde la nube');
+        } else {
+          showLoginOverlay(true);
+        }
+      } catch (e) {
+        console.warn('[Auth] getSession falló, mostrando login:', e.message);
         showLoginOverlay(true);
       }
     }
