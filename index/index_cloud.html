@@ -6973,15 +6973,6 @@
       const vSearch = document.getElementById('view-search');
       if (vSearch) vSearch.style.display = 'block';
       window.scrollTo(0, 0);
-      // Populate filters and show all events when entering the view
-      renderSearchFilterOptions();
-      const viewInput = document.getElementById('searchInputView');
-      const sideInput = document.getElementById('searchInput');
-      if (viewInput && sideInput) viewInput.value = sideInput.value;
-      const q = (viewInput?.value || sideInput?.value || '').trim();
-      if (document.getElementById('searchResults')?.children.length === 0) {
-        renderBusqueda(q); // render immediately when view opens
-      }
 
       document.querySelectorAll('.nav-item').forEach(el => {
         const txt = (el.textContent || '').toLowerCase();
