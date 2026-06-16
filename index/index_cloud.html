@@ -6129,6 +6129,11 @@
         const { data: gastosData } = await _sb.from('gastos')
           .select('*').eq('user_id', userId).order('fecha_iso');
         const _cloudRowCount = gastosData ? gastosData.length : 0;
+        // Snapshot local data BEFORE clearing — needed to detect months missing from cloud
+        const _localSnapshot = {};
+        Object.keys(xlData).forEach(m => {
+          if (xlData[m] && xlData[m].length > 0) _localSnapshot[m] = xlData[m].slice();
+        });
         if (_cloudRowCount > 0) {
           // Nube tiene datos — usarla como fuente de verdad
           MESES_ORDEN.forEach(mes => { xlData[mes] = []; });
@@ -6141,6 +6146,15 @@
             };
             xlCalcRow(row);
             xlData[g.mes_clave].push(row);
+          });
+          // Rescue: any month present locally but absent in cloud was a partial save.
+          // Restore local rows and mark that month dirty so it re-uploads.
+          Object.keys(_localSnapshot).forEach(m => {
+            if (!xlData[m] || xlData[m].length === 0) {
+              xlData[m] = _localSnapshot[m];
+              _cloudDirtyMes.add(m);
+              console.warn('[Cloud Restore] Mes', m, 'ausente en nube — restaurado desde local y marcado para re-subir');
+            }
           });
           console.log('[Cloud Restore] Cargados', _cloudRowCount, 'registros desde Supabase');
         } else {
@@ -6176,15 +6190,20 @@
         _cloudRestoreComplete = true;
         xlSaveLocalBackup('login');
         xlCheckDailyBackup();
-        // Solo subir a nube si estaba vacia y tenemos datos locales (recuperacion)
-        // Si la nube tenia datos, NO re-guardar: evita ciclo de borrado accidental
+        // Subir a nube:
+        // a) Nube estaba vacia => subir todo (recuperacion completa)
+        // b) Habia meses en local ausentes en nube => subir solo esos (recuperacion parcial)
         if (_cloudRowCount === 0) {
           const _localTotal = Object.values(xlData).reduce((s,a) => s+(a?a.length:0), 0);
           if (_localTotal > 0) {
-            console.log('[Cloud Restore] Recuperacion: subiendo', _localTotal, 'filas locales a nube');
+            console.log('[Cloud Restore] Recuperacion completa: subiendo', _localTotal, 'filas a nube');
             Object.keys(xlData).forEach(m => _cloudDirtyMes.add(m));
             xlPersistCloud();
           }
+        } else if (_cloudDirtyMes.size > 0) {
+          // Meses rescatados localmente que la nube no tenia
+          console.log('[Cloud Restore] Recuperacion parcial: re-subiendo', _cloudDirtyMes.size, 'mes(es) a nube');
+          xlPersistCloud();
         }
         return true;
       } catch (e) {
