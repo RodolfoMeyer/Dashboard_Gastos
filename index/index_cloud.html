@@ -4122,6 +4122,7 @@
     }
 
     function xlSetMes(m) {
+      xlScheduleCloudSave(xlMesActivo); // guardar mes anterior antes de cambiar
       xlMesActivo = m;
       xlFocused = null;
       xlSelected.clear();
@@ -5714,6 +5715,7 @@
     let _cloudRetryCount = 0;
     let _cloudRetryTimer = null;
     const _CLOUD_RETRY_DELAYS = [10000, 30000, 60000];
+    let _cloudRestoreComplete = false;
 
     function initSupabase() {
       if (!_sbConfigured || typeof supabase === 'undefined') return;
@@ -5958,6 +5960,10 @@
         });
 
         _cloudRestored = true;
+        _cloudRestoreComplete = true;
+        // Sync inicial: marcar todos los meses cargados para un guardado completo
+        Object.keys(xlData).forEach(m => _cloudDirtyMes.add(m));
+        xlPersistCloud();
         return true;
       } catch (e) {
         console.warn('xlRestoreCloud error:', e);
@@ -5965,11 +5971,12 @@
       }
     }
 
-    // ── Cloud Persist (async, robusto con retry) ─────────────
-    function xlScheduleCloudSave() {
-      if (!_sb || !_currentUser) return;
-      // Marcar TODOS los meses como sucios para garantizar sincronización completa
-      MESES_ORDEN.forEach(m => _cloudDirtyMes.add(m));
+    // ── Cloud Persist (async, robusto con retry y seguro) ─────────────
+    // xlScheduleCloudSave: solo marca el mes PASADO como dirty.
+    // Guard _cloudRestoreComplete previene saves durante el restore inicial.
+    function xlScheduleCloudSave(mes) {
+      if (!_sb || !_currentUser || !_cloudRestoreComplete) return;
+      _cloudDirtyMes.add(mes || xlMesActivo);
       clearTimeout(_cloudSaveTimer);
       clearTimeout(_cloudRetryTimer);
       _cloudRetryCount = 0;
@@ -5977,14 +5984,14 @@
     }
 
     async function xlPersistCloud() {
-      if (!_sb || !_currentUser) return;
-      if (_cloudSaveInProgress) return; // ya hay un guardado en curso
+      if (!_sb || !_currentUser || !_cloudRestoreComplete) return;
+      if (_cloudSaveInProgress) return;
       if (_cloudDirtyMes.size === 0) return;
 
       _cloudSaveInProgress = true;
       const userId = _currentUser.id;
-      // Snapshot de los meses a guardar ANTES de operar (no borrar el Set todavía)
       const dirtyMeses = [..._cloudDirtyMes];
+      const skipped = []; // meses nunca cargados en esta sesión — no tocar
 
       xlShowCloudIndicator('saving');
       try {
@@ -6002,9 +6009,14 @@
         const { error: mErr } = await _sb.from('meses').upsert(mesesRows, { onConflict: 'user_id,clave' });
         if (mErr) throw mErr;
 
-        // 2. Guardar gastos de cada mes sucio
+        // 2. Gastos: SOLO procesar meses que fueron cargados en esta sesión.
+        //    Si xlData[mes] === undefined, el mes no fue cargado → NO borrar cloud.
         for (const mes of dirtyMeses) {
-          const rows = (xlData[mes]||[]).map(r => {
+          if (!Object.prototype.hasOwnProperty.call(xlData, mes)) {
+            skipped.push(mes); // re-encolar para próximo intento
+            continue;
+          }
+          const rows = (xlData[mes] || []).map(r => {
             const mm = (r.fecha||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
             return {
               user_id: userId, mes_clave: mes,
@@ -6022,7 +6034,7 @@
           }
         }
 
-        // 3. Guardar transferencias completas
+        // 3. Transferencias completas
         const transfRows = transferencias.map(t => ({
           user_id: userId, mes_clave: t.mes, fecha: t.fecha||'',
           concepto: t.concepto||'', monto: t.monto||0, tipo: t.tipo
@@ -6034,15 +6046,16 @@
           if (tInsErr) throw tInsErr;
         }
 
-        // Éxito: limpiar Set y resetear retry
+        // Éxito: solo limpiar meses procesados (los skipped vuelven al Set)
         _cloudDirtyMes.clear();
+        skipped.forEach(m => _cloudDirtyMes.add(m));
         _cloudRetryCount = 0;
         _cloudSaveInProgress = false;
         xlShowCloudIndicator('ok');
 
       } catch (e) {
         _cloudSaveInProgress = false;
-        // Restaurar meses sucios para que el retry los incluya
+        // Restaurar todos los meses (procesados + skipped) para retry
         dirtyMeses.forEach(m => _cloudDirtyMes.add(m));
 
         if (_cloudRetryCount < _CLOUD_RETRY_DELAYS.length) {
@@ -6061,7 +6074,8 @@
 
     // Flush inmediato (sin debounce) — para beforeunload y visibilitychange
     function xlFlushCloud() {
-      if (!_sb || !_currentUser || _cloudDirtyMes.size === 0) return;
+      if (!_sb || !_currentUser || !_cloudRestoreComplete) return;
+      if (_cloudDirtyMes.size === 0) return;
       clearTimeout(_cloudSaveTimer);
       clearTimeout(_cloudRetryTimer);
       xlPersistCloud();
@@ -6122,7 +6136,7 @@
         STORAGE_META_ALL.forEach(k => localStorage.setItem(k, _metaStr));
         xlShowSavedIndicator('ok');
         // Cloud sync: marcar todos los meses y programar guardado
-        xlScheduleCloudSave();
+        xlScheduleCloudSave(xlMesActivo);
       } catch (e) {
         console.warn('localStorage no disponible:', e);
         xlShowSavedIndicator('error');
