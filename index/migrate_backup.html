@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TOLED · Migración a Supabase</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f1117; color: #e2e8f0; padding: 32px; max-width: 700px; margin: 0 auto; }
+    h1 { color: #f1c40f; margin-bottom: 8px; font-size: 22px; }
+    .sub { color: #64748b; font-size: 13px; margin-bottom: 28px; }
+    .card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; }
+    input, button { font-family: inherit; font-size: 13px; }
+    input[type="text"], input[type="password"], input[type="email"] {
+      width: 100%; padding: 10px 12px; background: #0f1117; border: 1px solid #2d3748;
+      border-radius: 6px; color: #e2e8f0; margin-bottom: 10px;
+    }
+    input:focus { outline: none; border-color: #f1c40f; }
+    .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; }
+    .btn-primary { background: #f1c40f; color: #0f1117; }
+    .btn-secondary { background: #2d3748; color: #e2e8f0; margin-left: 8px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .log { background: #0a0d14; border: 1px solid #1e293b; border-radius: 6px; padding: 14px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; margin-top: 12px; }
+    .log-line { padding: 2px 0; }
+    .log-ok  { color: #4ade80; }
+    .log-err { color: #f87171; }
+    .log-info{ color: #94a3b8; }
+    .log-warn{ color: #f59e0b; }
+    .progress { height: 4px; background: #1e293b; border-radius: 2px; margin: 10px 0; }
+    .progress-bar { height: 4px; background: #f1c40f; border-radius: 2px; transition: width 0.3s; width: 0%; }
+    label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+    .file-drop { border: 2px dashed #2d3748; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; color: #64748b; font-size: 13px; transition: border-color 0.2s; }
+    .file-drop:hover, .file-drop.drag { border-color: #f1c40f; color: #f1c40f; }
+    #fileInput { display: none; }
+    .status-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+    .badge-pending  { background: rgba(241,196,15,.15); color: #f1c40f; }
+    .badge-ok       { background: rgba(74,222,128,.15); color: #4ade80; }
+    .badge-error    { background: rgba(248,113,113,.15); color: #f87171; }
+  </style>
+</head>
+<body>
+
+<h1>TOLED · Migración a Supabase</h1>
+<p class="sub">Importa tu respaldo JSON al proyecto Supabase. Ejecutar una sola vez.</p>
+
+<!-- PASO 1: Configuración -->
+<div class="card">
+  <h2>Paso 1 · Credenciales Supabase</h2>
+  <label>URL del proyecto (ej: https://xxxx.supabase.co)</label>
+  <input type="text" id="sbUrl" placeholder="https://xxxxxxxxxxxxx.supabase.co">
+  <label>Anon Key (Supabase → Settings → API → anon public)</label>
+  <input type="password" id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIs...">
+  <label>Email de la cuenta</label>
+  <input type="email" id="sbEmail" placeholder="tu@email.com">
+  <label>Contraseña</label>
+  <input type="password" id="sbPass" placeholder="••••••••">
+  <button class="btn btn-primary" onclick="connectSupabase()">Conectar</button>
+  <span id="connStatus" class="status-badge badge-pending" style="margin-left:10px">Sin conectar</span>
+</div>
+
+<!-- PASO 2: Archivo de respaldo -->
+<div class="card">
+  <h2>Paso 2 · Archivo de Respaldo JSON</h2>
+  <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()"
+       ondragover="this.classList.add('drag');event.preventDefault()"
+       ondragleave="this.classList.remove('drag')"
+       ondrop="handleDrop(event)">
+    📁 Arrastra tu archivo <strong>respaldo_toled_*.json</strong> aquí o haz clic para seleccionar
+  </div>
+  <input type="file" id="fileInput" accept=".json" onchange="loadFile(this)">
+  <div id="fileInfo" style="margin-top:8px;font-size:12px;color:#64748b"></div>
+</div>
+
+<!-- PASO 3: Migrar -->
+<div class="card">
+  <h2>Paso 3 · Ejecutar Migración</h2>
+  <button class="btn btn-primary" id="btnMigrate" onclick="runMigration()" disabled>
+    🚀 Iniciar Migración
+  </button>
+  <button class="btn btn-secondary" onclick="clearLog()">Limpiar log</button>
+  <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="log" id="log"><div class="log-line log-info">Esperando...</div></div>
+</div>
+
+<script>
+  const { createClient } = supabase;
+  let _sb = null;
+  let _user = null;
+  let _backup = null;
+
+  function log(msg, type = 'info') {
+    const el = document.getElementById('log');
+    const line = document.createElement('div');
+    line.className = 'log-line log-' + type;
+    const ts = new Date().toLocaleTimeString('es-CL');
+    line.textContent = `[${ts}] ${msg}`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function clearLog() {
+    document.getElementById('log').innerHTML = '';
+  }
+
+  function setProgress(pct) {
+    document.getElementById('progressBar').style.width = pct + '%';
+  }
+
+  async function connectSupabase() {
+    const url = document.getElementById('sbUrl').value.trim();
+    const key = document.getElementById('sbKey').value.trim();
+    const email = document.getElementById('sbEmail').value.trim();
+    const pass = document.getElementById('sbPass').value.trim();
+
+    if (!url || !key || !email || !pass) {
+      log('Completa todos los campos', 'err'); return;
+    }
+
+    try {
+      log('Conectando a Supabase...', 'info');
+      _sb = createClient(url, key);
+      const { data, error } = await _sb.auth.signInWithPassword({ email, password: pass });
+      if (error) throw error;
+      _user = data.user;
+      log(`✓ Conectado como ${_user.email}`, 'ok');
+      document.getElementById('connStatus').textContent = '✓ Conectado';
+      document.getElementById('connStatus').className = 'status-badge badge-ok';
+      checkReady();
+    } catch (e) {
+      log('✗ Error: ' + e.message, 'err');
+      document.getElementById('connStatus').textContent = 'Error';
+      document.getElementById('connStatus').className = 'status-badge badge-error';
+    }
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('fileDrop').classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (file) readBackupFile(file);
+  }
+
+  function loadFile(input) {
+    const file = input.files[0];
+    if (file) readBackupFile(file);
+  }
+
+  function readBackupFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        _backup = JSON.parse(e.target.result);
+        const meses = (_backup.mesesOrden || []).length;
+        const transf = (_backup.transferencias || []).length;
+        let gastos = 0;
+        Object.values(_backup.xlData || {}).forEach(rows => { gastos += (rows || []).length; });
+        document.getElementById('fileInfo').innerHTML =
+          `✓ <strong>${file.name}</strong> · ${meses} meses · ${gastos} filas de gastos · ${transf} transferencias`;
+        log(`Archivo cargado: ${file.name}`, 'ok');
+        checkReady();
+      } catch (err) {
+        log('✗ Archivo inválido: ' + err.message, 'err');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function checkReady() {
+    document.getElementById('btnMigrate').disabled = !(_sb && _user && _backup);
+  }
+
+  // ── Helpers ──
+  function parseIsoDate(str) {
+    if (!str) return null;
+    // YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    // DD/MM/YYYY
+    const m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    return null;
+  }
+
+  async function runMigration() {
+    if (!_sb || !_user || !_backup) return;
+    document.getElementById('btnMigrate').disabled = true;
+    clearLog();
+    setProgress(0);
+
+    const userId = _user.id;
+    const { mesesOrden = [], xlData = {}, transferencias = [] } = _backup;
+
+    try {
+      // ── PASO A: Limpiar datos existentes ──
+      log('Limpiando datos anteriores en la nube...', 'warn');
+      await _sb.from('gastos').delete().eq('user_id', userId);
+      await _sb.from('transferencias').delete().eq('user_id', userId);
+      await _sb.from('meses').delete().eq('user_id', userId);
+      log('✓ Datos anteriores eliminados', 'ok');
+      setProgress(10);
+
+      // ── PASO B: Insertar meses ──
+      log(`Insertando ${mesesOrden.length} meses...`, 'info');
+      const mesesRows = mesesOrden.map((clave, idx) => {
+        const snap = _backup.dataMesesSnapshot?.[clave] || {};
+        const anioStr = (_backup.mesAnio || {})[clave] || String(new Date().getFullYear());
+        return {
+          user_id: userId,
+          clave,
+          label: snap.label || clave,
+          anio: parseInt(anioStr) || new Date().getFullYear(),
+          orden: idx,
+          total_viatico: snap.totalViatico || 0,
+          parking: snap.parking || 0,
+          combustible: snap.combustible || 0,
+          bodega: snap.bodega || 0,
+          otros: snap.otros || 0
+        };
+      });
+      const { error: mErr } = await _sb.from('meses').insert(mesesRows);
+      if (mErr) throw new Error('Meses: ' + mErr.message);
+      log(`✓ ${mesesRows.length} meses insertados`, 'ok');
+      setProgress(30);
+
+      // ── PASO C: Insertar gastos (en lotes de 500) ──
+      const allGastos = [];
+      mesesOrden.forEach(mes => {
+        const rows = xlData[mes] || [];
+        rows.forEach(r => {
+          allGastos.push({
+            user_id: userId,
+            mes_clave: mes,
+            fecha: r.fecha || '',
+            fecha_iso: parseIsoDate(r.fecha),
+            evento: r.evento || '',
+            funcion: r.funcion || '',
+            desayuno: r.desayuno || 0,
+            viatico: r.viatico || 0,
+            trasnoche: r.trasnoche || 0,
+            parking: r.parking || 0,
+            combustible: r.combustible || 0,
+            bodega: r.bodega || 0
+          });
+        });
+      });
+
+      log(`Insertando ${allGastos.length} filas de gastos...`, 'info');
+      const BATCH = 500;
+      for (let i = 0; i < allGastos.length; i += BATCH) {
+        const batch = allGastos.slice(i, i + BATCH);
+        const { error: gErr } = await _sb.from('gastos').insert(batch);
+        if (gErr) throw new Error('Gastos batch ' + i + ': ' + gErr.message);
+        const pct = 30 + Math.round(((i + batch.length) / allGastos.length) * 40);
+        setProgress(pct);
+        log(`  Lote ${Math.floor(i / BATCH) + 1}: ${i + batch.length}/${allGastos.length} filas`, 'info');
+      }
+      log(`✓ ${allGastos.length} gastos insertados`, 'ok');
+      setProgress(70);
+
+      // ── PASO D: Insertar transferencias ──
+      log(`Insertando ${transferencias.length} transferencias...`, 'info');
+      const transfRows = transferencias.map(t => ({
+        user_id: userId,
+        mes_clave: t.mes || '',
+        fecha: t.fecha || '',
+        concepto: t.concepto || '',
+        monto: t.monto || 0,
+        tipo: t.tipo || 'recibida'
+      }));
+      if (transfRows.length > 0) {
+        const { error: tErr } = await _sb.from('transferencias').insert(transfRows);
+        if (tErr) throw new Error('Transferencias: ' + tErr.message);
+      }
+      log(`✓ ${transfRows.length} transferencias insertadas`, 'ok');
+      setProgress(90);
+
+      // ── PASO E: Verificación ──
+      const { count: cMeses }   = await _sb.from('meses').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+      const { count: cGastos }  = await _sb.from('gastos').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+      const { count: cTransf }  = await _sb.from('transferencias').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+
+      setProgress(100);
+      log('', 'info');
+      log('═══════════════════════════════════', 'ok');
+      log('✅ MIGRACIÓN COMPLETADA', 'ok');
+      log(`   Meses:           ${cMeses}`, 'ok');
+      log(`   Gastos:          ${cGastos}`, 'ok');
+      log(`   Transferencias:  ${cTransf}`, 'ok');
+      log('═══════════════════════════════════', 'ok');
+      log('Ya puedes abrir index_cloud.html', 'ok');
+
+    } catch (err) {
+      log('✗ ERROR: ' + err.message, 'err');
+      setProgress(0);
+    }
+
+    document.getElementById('btnMigrate').disabled = false;
+  }
+</script>
+</body>
+</html>
