@@ -6221,7 +6221,9 @@
 
         const { data: gastosData } = await _sb.from('gastos')
           .select('*').eq('user_id', userId).order('fecha_iso');
-        if (gastosData) {
+        const _cloudRowCount = gastosData ? gastosData.length : 0;
+        if (_cloudRowCount > 0) {
+          // Nube tiene datos — usarla como fuente de verdad
           MESES_ORDEN.forEach(mes => { xlData[mes] = []; });
           gastosData.forEach(g => {
             if (!xlData[g.mes_clave]) xlData[g.mes_clave] = [];
@@ -6233,6 +6235,12 @@
             xlCalcRow(row);
             xlData[g.mes_clave].push(row);
           });
+          console.log('[Cloud Restore] Cargados', _cloudRowCount, 'registros desde Supabase');
+        } else {
+          // Nube vacia — NO limpiar xlData, preservar datos locales
+          const _localCount = Object.values(xlData).reduce((s,a) => s+(a?a.length:0), 0);
+          console.warn('[Cloud Restore] Nube sin gastos. Datos locales preservados:', _localCount, 'filas');
+          MESES_ORDEN.forEach(mes => { if (!xlData[mes]) xlData[mes] = []; });
         }
 
         const { data: transfData } = await _sb.from('transferencias')
@@ -6261,9 +6269,16 @@
         _cloudRestoreComplete = true;
         xlSaveLocalBackup('login');
         xlCheckDailyBackup();
-        // Sync inicial: marcar todos los meses cargados para un guardado completo
-        Object.keys(xlData).forEach(m => _cloudDirtyMes.add(m));
-        xlPersistCloud();
+        // Solo subir a nube si estaba vacia y tenemos datos locales (recuperacion)
+        // Si la nube tenia datos, NO re-guardar: evita ciclo de borrado accidental
+        if (_cloudRowCount === 0) {
+          const _localTotal = Object.values(xlData).reduce((s,a) => s+(a?a.length:0), 0);
+          if (_localTotal > 0) {
+            console.log('[Cloud Restore] Recuperacion: subiendo', _localTotal, 'filas locales a nube');
+            Object.keys(xlData).forEach(m => _cloudDirtyMes.add(m));
+            xlPersistCloud();
+          }
+        }
         return true;
       } catch (e) {
         console.warn('xlRestoreCloud error:', e);
@@ -6436,8 +6451,9 @@
         STORAGE_EXTRA_ALL.forEach(k => localStorage.setItem(k, _extraStr));
         STORAGE_META_ALL.forEach(k => localStorage.setItem(k, _metaStr));
         xlShowSavedIndicator('ok');
-        // Cloud sync: marcar todos los meses y programar guardado
-        xlScheduleCloudSave(xlMesActivo);
+        // Cloud sync: solo si hay datos reales (evita sobrescribir nube con estado vacio)
+        const _hasRows = Object.values(xlData).some(a => a && a.length > 0);
+        if (_hasRows) xlScheduleCloudSave(xlMesActivo);
       } catch (e) {
         console.warn('localStorage no disponible:', e);
         xlShowSavedIndicator('error');
