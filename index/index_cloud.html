@@ -6157,6 +6157,29 @@
             }
           });
           console.log('[Cloud Restore] Cargados', _cloudRowCount, 'registros desde Supabase');
+          // Scan for stale pre-save markers = months whose save was interrupted
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (!k || !k.startsWith('toled_presave_')) continue;
+            try {
+              const ps = JSON.parse(localStorage.getItem(k));
+              const ageMin = (Date.now() - ps.ts) / 60000;
+              // Marker older than 30 days → stale, remove
+              if (ageMin > 43200) { localStorage.removeItem(k); continue; }
+              const psMes = ps.mes;
+              const cloudCount = (xlData[psMes] || []).length;
+              const presaveCount = (ps.rows || []).length;
+              // Pre-save had rows but cloud has fewer → interrupted save detected
+              if (presaveCount > 0 && presaveCount > cloudCount) {
+                console.warn('[Cloud Restore] Guardado interrumpido detectado para', psMes,
+                  '— pre-save:', presaveCount, 'filas vs nube:', cloudCount, '. Restaurando.');
+                xlData[psMes] = ps.rows;
+                ps.rows.forEach(r => xlCalcRow(r));
+                _cloudDirtyMes.add(psMes);
+                // Keep the marker until cloud re-upload succeeds
+              }
+            } catch(e) { localStorage.removeItem(k); }
+          }
         } else {
           // Nube vacia — NO limpiar xlData, preservar datos locales
           const _localCount = Object.values(xlData).reduce((s,a) => s+(a?a.length:0), 0);
@@ -6267,12 +6290,22 @@
               parking: r.parking||0, combustible: r.combustible||0, bodega: r.bodega||0
             };
           });
+          // SAFE SAVE: write pre-save marker BEFORE delete.
+          // If app dies between delete and insert, next startup recovers from this.
+          const _presaveKey = 'toled_presave_' + mes;
+          try {
+            localStorage.setItem(_presaveKey, JSON.stringify({
+              ts: Date.now(), mes, rows: xlData[mes] || []
+            }));
+          } catch(e) { /* localStorage full — continue anyway */ }
           const { error: dErr } = await _sb.from('gastos').delete().match({ user_id: userId, mes_clave: mes });
           if (dErr) throw dErr;
           if (rows.length > 0) {
             const { error: iErr } = await _sb.from('gastos').insert(rows);
             if (iErr) throw iErr;
           }
+          // Insert succeeded — clear the pre-save marker
+          try { localStorage.removeItem('toled_presave_' + mes); } catch(e) {}
         }
 
         // 3. Transferencias completas
