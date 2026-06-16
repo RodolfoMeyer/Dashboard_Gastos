@@ -1503,6 +1503,7 @@
     @media (max-width: 767px) {
       body { overflow-x: hidden; }
 
+      /* ── Sidebar: oculto por defecto, slide-in al tocar ☰ ── */
       .sidebar {
         transform: translateX(-100%);
         transition: transform .28s cubic-bezier(.4,0,.2,1);
@@ -1514,33 +1515,98 @@
         transform: translateX(0);
         box-shadow: 4px 0 28px rgba(0,0,0,.55);
       }
-
-      /* Avatar compacto en mobile */
       .avatar { height: 90px !important; font-size: 30px !important; }
-      .profile-card { margin: 8px 8px 8px !important; padding: 10px 10px 10px !important; }
+      .profile-card { margin: 8px !important; padding: 10px !important; }
       .brand { padding: 0 16px 16px !important; }
 
+      /* ── Hamburger visible ── */
       #mobileMenuBtn { display: flex !important; }
 
-      .main {
-        margin-left: 0 !important;
-        padding: 64px 14px 20px !important; /* 64px deja espacio al botón hamburger */
+      /* ── Contenido principal ── */
+      .main { margin-left: 0 !important; padding: 62px 12px 24px !important; }
+
+      /* ── Topbar ── */
+      .topbar { flex-wrap: wrap; gap: 8px; margin-bottom: 16px !important; align-items: flex-start !important; }
+      .topbar-right { flex-wrap: wrap; gap: 6px; }
+      .page-title { font-size: 17px !important; }
+      .page-sub { font-size: 11px !important; margin-top: 2px !important; }
+
+      /* Month selector: scroll horizontal silencioso */
+      .month-selector {
+        overflow-x: auto; flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; max-width: calc(100vw - 24px);
+        padding-bottom: 2px;
+      }
+      .month-selector::-webkit-scrollbar { display: none; }
+      .month-btn {
+        white-space: nowrap; flex-shrink: 0;
+        padding: 5px 10px !important; font-size: 11px !important;
       }
 
-      .topbar { flex-wrap: wrap; gap: 8px; }
-      .topbar-right { flex-wrap: wrap; gap: 6px; }
-      .page-title { font-size: 18px !important; }
+      /* Botones topbar más compactos */
+      .topbar-right .btn-primary,
+      .topbar-right .btn-ghost { padding: 7px 12px !important; font-size: 12px !important; }
 
-      .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
-      .grid-2 { grid-template-columns: 1fr !important; }
-      .grid-3 { grid-template-columns: 1fr !important; }
+      /* ── KPIs: 2 columnas ── */
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important; margin-bottom: 14px !important;
+      }
+      .kpi-card { padding: 13px 12px !important; }
+      .kpi-value { font-size: 19px !important; }
+      .kpi-label { font-size: 10px !important; }
+      .kpi-icon { font-size: 22px !important; top: 10px !important; right: 10px !important; }
+      .kpi-delta { font-size: 10px !important; padding: 2px 6px !important; }
 
-      /* Tabla planilla: scroll horizontal */
-      .xl-table-wrap, .xl-grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      /* ── Grids: 1 columna ── */
+      .grid-2 { grid-template-columns: 1fr !important; gap: 12px !important; }
+      .grid-3 { grid-template-columns: 1fr !important; gap: 12px !important; }
 
-      /* Cloud/save indicators: moverlos para no chocar con hamburger */
-      #xlCloudInd { left: 14px !important; bottom: 62px !important; }
-      #xlSavedInd { left: 14px !important; bottom: 24px !important; }
+      /* ── Panels ── */
+      .panel-head { padding: 12px 14px 10px !important; }
+      .panel-title { font-size: 13px !important; }
+      .panel-body { padding: 12px !important; }
+      .chart-wrap { height: 190px !important; }
+
+      /* ── Tablas internas ── */
+      .data-table { font-size: 12px; }
+      .data-table th { font-size: 9px !important; padding: 0 6px 8px 0 !important; }
+      .data-table td { font-size: 12px !important; padding: 8px 6px 8px 0 !important; }
+
+      /* ── Planilla / xl: scroll horizontal ── */
+      .xl-table-wrap, .xl-grid-wrap,
+      [id^="xlGrid"] { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+      /* ── Saldo boxes ── */
+      .saldo-box { padding: 10px 12px !important; }
+      .saldo-box-value { font-size: 14px !important; }
+
+      /* ── Modales: bottom sheet ── */
+      .modal-overlay { align-items: flex-end !important; }
+      .modal {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 88vh !important;
+        border-radius: 18px 18px 0 0 !important;
+        animation: mobileSheetIn .28s ease !important;
+      }
+      @keyframes mobileSheetIn {
+        from { transform: translateY(100%); }
+        to   { transform: translateY(0); }
+      }
+      .modal-head { padding: 16px 16px 12px !important; }
+      .modal-body { padding: 14px 16px !important; }
+      .modal-footer { padding: 12px 16px 20px !important; }
+      .form-row   { grid-template-columns: 1fr !important; gap: 10px !important; }
+      .form-row-3 { grid-template-columns: 1fr !important; gap: 10px !important; }
+
+      /* ── Toast ── */
+      .toast { left: 12px !important; right: 12px !important; bottom: 12px !important; }
+
+      /* ── Save / cloud indicators ── */
+      #xlCloudInd { left: 12px !important; bottom: 60px !important; }
+      #xlSavedInd { left: 12px !important; bottom: 22px !important; }
     }
 
     </style>
