@@ -2095,293 +2095,118 @@
     <div id="view-ayuda" style="display:none">
       <div class="topbar">
         <div>
-          <div class="page-title">📖 Ayuda</div>
-          <div class="page-sub">Manual de uso · Sistema TOLED</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="xl-btn" id="btnVerMD" onclick="ayudaToggleMD()"
-            style="background:rgba(212,168,67,.12);border-color:rgba(212,168,67,.35);color:var(--accent);font-weight:600">
-            📝 Ver Manual Completo
-          </button>
+          <div class="page-title">Ayuda</div>
+          <div class="page-sub">Manual de uso · Sistema TOLED v3.0</div>
         </div>
       </div>
 
       <div style="max-width:860px;margin:0 auto;padding:8px 0 48px;font-family:'DM Sans',sans-serif">
 
-        <!-- Visor Markdown inline (oculto por defecto) -->
-        <div id="ayudaMdVisor" style="display:none;margin-bottom:24px">
-          <div class="panel" style="border-color:rgba(212,168,67,.3)">
-            <div class="panel-head"
-              style="background:rgba(212,168,67,.06);display:flex;align-items:center;justify-content:space-between">
-              <div class="panel-title" style="color:var(--accent)">📝 Manual Completo — Sistema TOLED</div>
-              <button class="xl-btn" onclick="ayudaToggleMD()" style="font-size:11px;padding:3px 10px">✕ Cerrar</button>
-            </div>
-            <div id="ayudaMdContenido"
-              style="padding:24px 28px;font-size:13.5px;line-height:1.75;color:var(--text2);font-family:'DM Sans',sans-serif">
-            </div>
-          </div>
-        </div>
-
-        <!-- Secciones del sistema -->
+        <!-- Secciones -->
         <div class="panel" style="margin-bottom:20px">
-          <div class="panel-head">
-            <div class="panel-title">Secciones del Sistema</div>
-          </div>
+          <div class="panel-head"><div class="panel-title">Secciones del Sistema</div></div>
           <div class="panel-body">
             <table class="data-table" style="width:100%">
-              <thead>
-                <tr>
-                  <th style="text-align:left;width:180px">Sección</th>
-                  <th style="text-align:left">Descripción</th>
-                </tr>
-              </thead>
+              <thead><tr><th style="text-align:left;width:180px">Sección</th><th style="text-align:left">Descripción</th></tr></thead>
               <tbody>
-                <tr>
-                  <td><strong>▦ Dashboard</strong></td>
-                  <td>Resumen ejecutivo: KPIs, gráficos de evolución, desglose de gastos y últimas transferencias.</td>
-                </tr>
-                <tr>
-                  <td><strong>☰ Detalle Gastos</strong></td>
-                  <td>Tabla completa fila a fila de todos los eventos del mes. Solo lectura.</td>
-                </tr>
-                <tr>
-                  <td><strong>⇄ Saldos</strong></td>
-                  <td>Estado de cuenta: transferido vs. gastado, registrar transferencias y ajuste manual de saldo.</td>
-                </tr>
-                <tr>
-                  <td><strong>⊞ Ingreso Planilla</strong></td>
-                  <td>Hoja de cálculo para ingresar y editar gastos. Cálculo automático en tiempo real.</td>
-                </tr>
-                <tr>
-                  <td><strong>🗂 Períodos &amp; Años</strong></td>
-                  <td>Vista consolidada por año con todos los meses, eventos y totales.</td>
-                </tr>
+                <tr><td><strong>Dashboard</strong></td><td>Resumen ejecutivo: KPIs, gráficos y últimas transferencias. Se actualiza automáticamente al editar la planilla.</td></tr>
+                <tr><td><strong>Detalle Gastos</strong></td><td>Tabla completa fila a fila de todos los eventos del mes. Solo lectura.</td></tr>
+                <tr><td><strong>Saldos</strong></td><td>Estado de cuenta: transferido vs. gastado, registrar transferencias y ajuste manual.</td></tr>
+                <tr><td><strong>Ingreso Planilla</strong></td><td>Hoja de cálculo estilo Excel para ingresar y editar gastos con copiar/pegar.</td></tr>
+                <tr><td><strong>Períodos &amp; Años</strong></td><td>Vista consolidada por año con totales y saldos de todos los meses.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Barra de herramientas Planilla -->
+        <!-- Barra de herramientas -->
         <div class="panel" style="margin-bottom:20px">
-          <div class="panel-head">
-            <div class="panel-title">🛠 Barra de Herramientas — Planilla</div>
-          </div>
+          <div class="panel-head"><div class="panel-title">Barra de Herramientas — Planilla</div></div>
           <div class="panel-body">
             <table class="data-table" style="width:100%">
-              <thead>
-                <tr>
-                  <th style="text-align:left;width:180px">Botón</th>
-                  <th style="text-align:left">Función</th>
-                </tr>
-              </thead>
+              <thead><tr><th style="text-align:left;width:180px">Botón</th><th style="text-align:left">Función</th></tr></thead>
               <tbody>
-                <tr>
-                  <td><strong>+ Agregar Fila</strong></td>
-                  <td>Agrega una fila vacía al final del mes activo.</td>
-                </tr>
-                <tr>
-                  <td><strong>Duplicar Fila</strong></td>
-                  <td>Copia la fila seleccionada.</td>
-                </tr>
-                <tr>
-                  <td><strong>Eliminar Fila</strong></td>
-                  <td>Elimina la fila seleccionada (pide confirmación).</td>
-                </tr>
-                <tr>
-                  <td><strong>+ Agregar Mes</strong></td>
-                  <td>Crea un nuevo mes dinámico en el sistema.</td>
-                </tr>
-                <tr>
-                  <td><strong>↺ Sincronizar</strong></td>
-                  <td>Actualiza los totales del Dashboard con los datos actuales de la Planilla.</td>
-                </tr>
-                <tr>
-                  <td><strong>↓ Exportar CSV</strong></td>
-                  <td>Descarga los datos del mes activo como archivo CSV.</td>
-                </tr>
-                <tr>
-                  <td><strong>↑ Importar CSV</strong></td>
-                  <td>Carga datos desde un archivo CSV o Excel al mes activo.</td>
-                </tr>
-                <tr>
-                  <td><strong>⬇ Respaldar Datos</strong></td>
-                  <td>Exporta todos los datos a un archivo JSON externo. Usar al terminar cada jornada.</td>
-                </tr>
-                <tr>
-                  <td><strong>⬆ Cargar Respaldo</strong></td>
-                  <td>Restaura todos los datos desde un archivo JSON de respaldo.</td>
-                </tr>
+                <tr><td><strong>+ Agregar Fila</strong></td><td>Agrega una fila vacía al final del mes activo.</td></tr>
+                <tr><td><strong>Duplicar Fila</strong></td><td>Copia la fila seleccionada justo debajo.</td></tr>
+                <tr><td><strong>Eliminar Fila</strong></td><td>Elimina la fila seleccionada (pide confirmación).</td></tr>
+                <tr><td><strong>+ Agregar Mes</strong></td><td>Crea un nuevo mes dinámico en el sistema.</td></tr>
+                <tr><td><strong>Exportar Excel</strong></td><td>Descarga el mes activo en formato .xlsx con grupos, totales y saldo.</td></tr>
+                <tr><td><strong>Importar CSV</strong></td><td>Carga datos desde un archivo CSV o Excel al mes activo.</td></tr>
+                <tr><td><strong>Respaldar</strong></td><td>Descarga un archivo JSON con todos los datos de todos los meses.</td></tr>
+                <tr><td><strong>Cargar</strong></td><td>Restaura todos los datos desde un archivo JSON de respaldo.</td></tr>
+                <tr><td><strong>Respaldos</strong></td><td>Muestra los últimos 5 respaldos automáticos guardados en este navegador.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Navegación teclado -->
-        <div class="panel" style="margin-bottom:20px">
-          <div class="panel-head">
-            <div class="panel-title">⌨ Navegación con Teclado (Planilla)</div>
+        <!-- Modo Excel: copiar y pegar -->
+        <div class="panel" style="margin-bottom:20px;border-color:rgba(91,140,220,.3)">
+          <div class="panel-head" style="background:rgba(91,140,220,.06)">
+            <div class="panel-title" style="color:#5b8cdc">Modo Edición Excel — Selección y Copiar/Pegar</div>
           </div>
           <div class="panel-body">
-            <table class="data-table" style="width:100%">
-              <thead>
-                <tr>
-                  <th style="text-align:left;width:140px">Tecla</th>
-                  <th style="text-align:left">Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code
-                      style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Tab</code>
-                  </td>
-                  <td>Avanza a la siguiente celda editable. Al llegar al borde, pasa a la siguiente fila.</td>
-                </tr>
-                <tr>
-                  <td><code
-                      style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Shift+Tab</code>
-                  </td>
-                  <td>Retrocede a la celda anterior.</td>
-                </tr>
-                <tr>
-                  <td><code
-                      style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Enter</code>
-                  </td>
-                  <td>Baja a la misma columna en la fila siguiente.</td>
-                </tr>
-                <tr>
-                  <td><code
-                      style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">↑ / ↓</code>
-                  </td>
-                  <td>Sube o baja una fila en la misma columna.</td>
-                </tr>
-                <tr>
-                  <td><code
-                      style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">→ / ←</code>
-                  </td>
-                  <td>Avanza o retrocede entre celdas (desde el borde del texto).</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Formatos de fecha -->
-        <div class="panel" style="margin-bottom:20px">
-          <div class="panel-head">
-            <div class="panel-title">📅 Formatos de Fecha Aceptados</div>
-          </div>
-          <div class="panel-body">
-            <table class="data-table" style="width:100%">
-              <thead>
-                <tr>
-                  <th>Formato ingresado</th>
-                  <th>Resultado</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>28022026</code></td>
-                  <td>28/02/2026</td>
-                </tr>
-                <tr>
-                  <td><code>28-02-2026</code></td>
-                  <td>28/02/2026</td>
-                </tr>
-                <tr>
-                  <td><code>28/02/26</code></td>
-                  <td>28/02/2026</td>
-                </tr>
-                <tr>
-                  <td><code>2802</code> (solo día/mes)</td>
-                  <td>28/02/2026 (año del mes activo)</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Ajuste manual de saldo -->
-        <div class="panel" style="margin-bottom:20px;border-color:rgba(212,168,67,.3)">
-          <div class="panel-head" style="background:rgba(212,168,67,.06)">
-            <div class="panel-title" style="color:var(--accent)">⚖ Ajuste Manual de Saldo</div>
-            <div class="panel-sub">Sección: Saldos &amp; Transferencias</div>
-          </div>
-          <div class="panel-body">
-            <p style="font-size:13px;color:var(--text2);margin:0 0 12px">Permite corregir diferencias puntuales sin
-              crear una transferencia formal. Úsalo cuando hay un gasto o ingreso excepcional fuera de la planilla.</p>
+            <p style="font-size:13px;color:var(--text2);margin:0 0 14px">La planilla funciona como Excel: puedes seleccionar rangos de celdas, copiar y pegar entre meses o desde Excel/Google Sheets.</p>
             <table class="data-table" style="width:100%;margin-bottom:16px">
-              <thead>
-                <tr>
-                  <th>Valor ingresado</th>
-                  <th>Efecto</th>
-                </tr>
-              </thead>
+              <thead><tr><th style="text-align:left">Acción</th><th style="text-align:left">Cómo hacerlo</th></tr></thead>
               <tbody>
-                <tr>
-                  <td style="color:var(--red)">Negativo (ej: −15000)</td>
-                  <td>Registra un <strong>gasto extra</strong> → aumenta el Total Gastado → reduce el saldo.</td>
-                </tr>
-                <tr>
-                  <td style="color:var(--green)">Positivo (ej: +10000)</td>
-                  <td>Registra un <strong>ingreso extra</strong> → reduce el déficit o aumenta el saldo a favor.</td>
-                </tr>
+                <tr><td>Seleccionar una celda</td><td>Clic en la celda.</td></tr>
+                <tr><td>Extender selección</td><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Shift + Clic</code> en otra celda.</td></tr>
+                <tr><td>Extender con teclado</td><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Shift + ↑↓←→</code></td></tr>
+                <tr><td>Seleccionar fila entera</td><td>Clic en el número de fila (1, 2, 3…).</td></tr>
+                <tr><td>Seleccionar varias filas</td><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Shift + Clic</code> en otro número de fila.</td></tr>
+                <tr><td>Seleccionar todo el mes</td><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Ctrl + A</code></td></tr>
+                <tr><td>Limpiar selección</td><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Escape</code></td></tr>
+                <tr><td><strong>Copiar selección</strong></td><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Ctrl + C</code> — compatible con Excel y Google Sheets.</td></tr>
+                <tr><td><strong>Pegar desde portapapeles</strong></td><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Ctrl + V</code> — pega desde Excel, otra pestaña o entre meses.</td></tr>
               </tbody>
             </table>
-            <div
-              style="font-size:11px;color:var(--text3);background:var(--surface2);border-radius:6px;padding:8px 12px">
-              ⚠ El ajuste se acumula. Si lo aplicas dos veces, se suma dos veces. Para corregir un ajuste erróneo,
-              ingresa el valor contrario.
+            <div style="background:rgba(91,140,220,.08);border:1px solid rgba(91,140,220,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text2)">
+              La selección se muestra en azul. Las columnas calculadas (Total Viático, TOTAL) se omiten al pegar y se recalculan automáticamente.
             </div>
           </div>
         </div>
 
-        <!-- Guardado automático -->
+        <!-- Navegacion teclado -->
         <div class="panel" style="margin-bottom:20px">
-          <div class="panel-head">
-            <div class="panel-title">💾 Guardado Automático</div>
-          </div>
+          <div class="panel-head"><div class="panel-title">Navegación con Teclado</div></div>
           <div class="panel-body">
             <table class="data-table" style="width:100%">
-              <thead>
-                <tr>
-                  <th>Momento</th>
-                  <th>Descripción</th>
-                </tr>
-              </thead>
+              <thead><tr><th style="text-align:left;width:160px">Tecla</th><th style="text-align:left">Acción</th></tr></thead>
               <tbody>
-                <tr>
-                  <td>Al salir de cada celda</td>
-                  <td>Guardado inmediato.</td>
-                </tr>
-                <tr>
-                  <td>1,5 seg tras el último cambio</td>
-                  <td>Guardado automático por debounce mientras se escribe.</td>
-                </tr>
-                <tr>
-                  <td>Al minimizar o cambiar pestaña</td>
-                  <td>El sistema guarda al perder el foco.</td>
-                </tr>
-                <tr>
-                  <td>Al cerrar la página</td>
-                  <td>Guardado sincrónico justo antes de cerrar.</td>
-                </tr>
-                <tr>
-                  <td>Cada 20 segundos</td>
-                  <td>Respaldo periódico automático.</td>
-                </tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Tab</code></td><td>Avanza a la siguiente celda editable.</td></tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Shift+Tab</code></td><td>Retrocede a la celda anterior.</td></tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Enter</code></td><td>Baja a la misma columna en la fila siguiente.</td></tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">↑ / ↓</code></td><td>Sube o baja una fila.</td></tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">→ / ←</code></td><td>Avanza o retrocede entre celdas.</td></tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Shift+↑↓←→</code></td><td>Extiende la selección de celdas.</td></tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Ctrl+A</code></td><td>Selecciona todas las celdas del mes.</td></tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Ctrl+C</code></td><td>Copia la selección al portapapeles.</td></tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Ctrl+V</code></td><td>Pega desde el portapapeles.</td></tr>
+                <tr><td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">Escape</code></td><td>Limpia la selección actual.</td></tr>
               </tbody>
             </table>
-            <div style="margin-top:12px;font-size:12px;color:var(--text3)">
-              Badge en toolbar:
-              <span
-                style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f5a623;margin:0 4px 0 8px;vertical-align:middle"></span>Naranja
-              = pendiente ·
-              <span
-                style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin:0 4px 0 8px;vertical-align:middle"></span>Verde
-              = guardado ·
-              <span
-                style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin:0 4px 0 8px;vertical-align:middle"></span>Rojo
-              = error
+          </div>
+        </div>
+
+        <!-- Guardado y nube -->
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-head"><div class="panel-title">Guardado Automático y Sincronización</div></div>
+          <div class="panel-body">
+            <p style="font-size:13px;color:var(--text2);margin:0 0 12px">Los datos se guardan en <strong>tres lugares</strong> automáticamente:</p>
+            <table class="data-table" style="width:100%;margin-bottom:14px">
+              <thead><tr><th style="text-align:left">Donde</th><th style="text-align:left">Cuándo</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Nube (Supabase)</strong></td><td>3 segundos después del último cambio. Disponible en cualquier dispositivo.</td></tr>
+                <tr><td><strong>Navegador local</strong></td><td>Al salir de cada celda, cada 20 segundos y al cerrar la página.</td></tr>
+                <tr><td><strong>Dashboard</strong></td><td>Se actualiza automáticamente 800ms después de editar una celda.</td></tr>
+              </tbody>
+            </table>
+            <div style="font-size:12px;color:var(--text3);background:var(--surface2);border-radius:6px;padding:8px 12px">
+              Indicador en toolbar:
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f5a623;margin:0 4px 0 8px;vertical-align:middle"></span>Naranja = guardando ·
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin:0 4px 0 8px;vertical-align:middle"></span>Verde = guardado ·
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin:0 4px 0 8px;vertical-align:middle"></span>Rojo = error (reintenta automáticamente)
             </div>
           </div>
         </div>
@@ -2389,83 +2214,61 @@
         <!-- Sistema de respaldo -->
         <div class="panel" style="margin-bottom:20px;border-color:rgba(76,175,125,.25)">
           <div class="panel-head" style="background:rgba(76,175,125,.06)">
-            <div class="panel-title" style="color:var(--green)">🔒 Sistema de Respaldo</div>
+            <div class="panel-title" style="color:var(--green)">Sistema de Respaldo — 3 Capas</div>
           </div>
           <div class="panel-body">
-            <p style="font-size:13px;color:var(--text2);margin:0 0 12px">El sistema usa dos mecanismos de persistencia
-              complementarios:</p>
-            <table class="data-table" style="width:100%;margin-bottom:14px">
-              <thead>
-                <tr>
-                  <th>Mecanismo</th>
-                  <th>Descripción</th>
-                </tr>
-              </thead>
+            <table class="data-table" style="width:100%;margin-bottom:16px">
+              <thead><tr><th style="text-align:left;width:60px">#</th><th style="text-align:left;width:200px">Capa</th><th style="text-align:left">Descripción</th></tr></thead>
               <tbody>
-                <tr>
-                  <td><strong>localStorage (automático)</strong></td>
-                  <td>Los datos se guardan en el navegador automáticamente. Disponibles al reabrir el mismo archivo en
-                    el mismo equipo.</td>
-                </tr>
-                <tr>
-                  <td><strong>Respaldo JSON (manual)</strong></td>
-                  <td>Usa <strong>⬇ Respaldar Datos</strong> para exportar un archivo .json. Para restaurar usa
-                    <strong>⬆ Cargar Respaldo</strong>.</td>
-                </tr>
+                <tr><td>1</td><td><strong>Nube (Supabase)</strong></td><td>Principal. Sincronización automática. Accesible desde cualquier dispositivo al iniciar sesión.</td></tr>
+                <tr><td>2</td><td><strong>Snapshots automáticos</strong></td><td>Hasta 5 capturas en el navegador. Ver y restaurar con el botón <strong>Respaldos</strong> en la planilla.</td></tr>
+                <tr><td>3</td><td><strong>Descarga JSON diaria</strong></td><td>Una vez al día se descarga automáticamente un archivo JSON. Restaurar con el botón <strong>Cargar</strong>.</td></tr>
               </tbody>
             </table>
-            <div
-              style="background:rgba(76,175,125,.08);border:1px solid rgba(76,175,125,.2);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--text2)">
-              💡 <strong>Recomendación:</strong> Respaldar al terminar cada jornada de ingreso. Guardar el archivo .json
-              en una carpeta fija (iCloud, Escritorio, etc.).
-            </div>
+            <table class="data-table" style="width:100%">
+              <thead><tr><th style="text-align:left">Situación</th><th style="text-align:left">Solución</th></tr></thead>
+              <tbody>
+                <tr><td>Datos correctos en la nube</td><td>Cerrar sesión y volver a entrar.</td></tr>
+                <tr><td>Nube vacía, datos en navegador</td><td>Los datos locales se suben automáticamente al hacer login.</td></tr>
+                <tr><td>Necesitas una versión anterior</td><td>Botón <strong>Respaldos</strong> → seleccionar snapshot → Restaurar.</td></tr>
+                <tr><td>Tienes un archivo .json</td><td>Botón <strong>Cargar</strong> → seleccionar el archivo JSON.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Preguntas frecuentes -->
+        <!-- Formatos de fecha -->
         <div class="panel" style="margin-bottom:20px">
-          <div class="panel-head">
-            <div class="panel-title">❓ Preguntas Frecuentes</div>
+          <div class="panel-head"><div class="panel-title">Formatos de Fecha Aceptados</div></div>
+          <div class="panel-body">
+            <table class="data-table" style="width:100%">
+              <thead><tr><th>Formato ingresado</th><th>Resultado</th></tr></thead>
+              <tbody>
+                <tr><td><code>28022026</code></td><td>28/02/2026</td></tr>
+                <tr><td><code>28-02-2026</code></td><td>28/02/2026</td></tr>
+                <tr><td><code>28/02/26</code></td><td>28/02/2026</td></tr>
+                <tr><td><code>2802</code></td><td>28/02/2026 (año del mes activo)</td></tr>
+              </tbody>
+            </table>
           </div>
-          <div class="panel-body" style="display:flex;flex-direction:column;gap:14px">
-            <div>
-              <div style="font-weight:600;font-size:13px;color:var(--text)">¿Puedo usar el sistema en otro computador?
-              </div>
-              <div style="font-size:12px;color:var(--text2);margin-top:3px">Sí. Usa <strong>⬇ Respaldar Datos</strong>
-                para exportar un .json con todos tus datos, luego ábrelo en el nuevo equipo con <strong>⬆ Cargar
-                  Respaldo</strong>.</div>
-            </div>
-            <div>
-              <div style="font-weight:600;font-size:13px;color:var(--text)">¿Qué pasa si cierro el navegador por
-                accidente?</div>
-              <div style="font-size:12px;color:var(--text2);margin-top:3px">El sistema guarda automáticamente antes de
-                cerrar. Al reabrir el mismo archivo, los datos se restauran desde el navegador.</div>
-            </div>
-            <div>
-              <div style="font-weight:600;font-size:13px;color:var(--text)">¿Por qué el conteo de eventos no coincide
-                con las filas?</div>
-              <div style="font-size:12px;color:var(--text2);margin-top:3px">Solo se cuentan las filas donde la columna
-                "Nombre Evento" tiene texto. Las fechas sin evento no se cuentan.</div>
-            </div>
-            <div>
-              <div style="font-weight:600;font-size:13px;color:var(--text)">Ingresé un ajuste manual equivocado, ¿cómo
-                corrijo?</div>
-              <div style="font-size:12px;color:var(--text2);margin-top:3px">Ingresa el valor contrario. Si pusiste
-                −15000 por error, ingresa +15000. Los ajustes se acumulan.</div>
-            </div>
-            <div>
-              <div style="font-weight:600;font-size:13px;color:var(--text)">¿Para qué sirve "Respaldar Datos" y cuándo
-                debo usarlo?</div>
-              <div style="font-size:12px;color:var(--text2);margin-top:3px">Genera un .json con todos los datos. Úsalo
-                al terminar el día. Si abres una nueva versión del archivo HTML y los datos no cargan, usa <strong>⬆
-                  Cargar Respaldo</strong>.</div>
-            </div>
-            <div>
-              <div style="font-weight:600;font-size:13px;color:var(--text)">¿Qué diferencia hay entre "Sincronizar
-                Dashboard" y "Respaldar Datos"?</div>
-              <div style="font-size:12px;color:var(--text2);margin-top:3px"><strong>Sincronizar</strong> actualiza los
-                totales del Dashboard internamente. <strong>Respaldar</strong> exporta todos los datos a un archivo
-                externo para protegerlos.</div>
+        </div>
+
+        <!-- Ajuste manual -->
+        <div class="panel" style="margin-bottom:20px;border-color:rgba(212,168,67,.3)">
+          <div class="panel-head" style="background:rgba(212,168,67,.06)">
+            <div class="panel-title" style="color:var(--accent)">Ajuste Manual de Saldo</div>
+          </div>
+          <div class="panel-body">
+            <p style="font-size:13px;color:var(--text2);margin:0 0 12px">Permite corregir diferencias sin crear una transferencia formal.</p>
+            <table class="data-table" style="width:100%;margin-bottom:12px">
+              <thead><tr><th>Valor ingresado</th><th>Efecto</th></tr></thead>
+              <tbody>
+                <tr><td style="color:var(--red)">Negativo (ej: −15000)</td><td>Registra un gasto extra → reduce el saldo.</td></tr>
+                <tr><td style="color:var(--green)">Positivo (ej: +10000)</td><td>Registra un ingreso extra → aumenta el saldo.</td></tr>
+              </tbody>
+            </table>
+            <div style="font-size:11px;color:var(--text3);background:var(--surface2);border-radius:6px;padding:8px 12px">
+              El ajuste se acumula. Para corregir uno erróneo, ingresa el valor contrario.
             </div>
           </div>
         </div>
