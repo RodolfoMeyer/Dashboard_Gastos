@@ -1974,7 +1974,6 @@
         <div class="xl-toolbar-group">
           <div class="xl-toolbar-group-label">Sincronización y Backup</div>
           <div class="xl-toolbar-actions">
-            <button class="xl-btn success" onclick="xlSyncDashboard()" title="Actualizar Dashboard con estos datos">↺ Sincronizar</button>
             <button class="xl-btn" onclick="respaldarDatos()" title="Backup total (JSON)" style="color:var(--green)">⬇ Respaldar</button>
             <button class="xl-btn" onclick="document.getElementById('inputCargarRespaldo').click()" title="Cargar Backup (JSON)" style="color:var(--accent)">⬆ Cargar</button>
             <button class="xl-btn" onclick="xlShowLocalBackupsModal()" title="Ver respaldos automaticos guardados localmente" style="color:var(--blue,#5b8cdc)">🗂 Respaldos</button>
@@ -4377,6 +4376,10 @@
 
       // ── Guardar (debounced) ──
       if (typeof xlScheduleSave === 'function') xlScheduleSave();
+
+      // ── Sincronizar Dashboard en segundo plano (debounced) ──
+      clearTimeout(xlCellChange._syncTimer);
+      xlCellChange._syncTimer = setTimeout(() => xlSyncDashboard(xlMesActivo), 800);
 
       // ── Refrescar Detalle en tiempo real si está visible ──
       const _det = document.getElementById('view-detalle');
