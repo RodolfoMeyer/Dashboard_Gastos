@@ -2073,19 +2073,31 @@
 
     <!-- ═══════════ VIEW: BÚSQUEDA ═══════════ -->
     <div id="view-search" style="display:none">
-      <div class="topbar">
-        <div>
+      <div class="topbar" style="flex-wrap:wrap;gap:10px">
+        <div style="flex:1;min-width:200px">
           <div class="page-title">Buscador de Eventos</div>
-          <div id="searchSubtitle" class="page-sub">Escribe en el buscador para encontrar eventos</div>
+          <div id="searchSubtitle" class="page-sub">Escribe un texto o selecciona mes/año para filtrar</div>
         </div>
-        <div class="topbar-right">
-          <select id="searchAnioSelect" onchange="renderBusquedaFromControls()" style="min-width:130px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="position:relative;min-width:220px">
+            <input
+              id="searchInputView"
+              type="text"
+              placeholder="Buscar evento, función..."
+              autocomplete="off"
+              oninput="buscarEventosView(this.value)"
+              onkeydown="if(event.key==='Escape'){clearSearchView()}"
+              style="width:100%;padding:8px 34px 8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box"
+            />
+            <span id="searchViewClearBtn" onclick="clearSearchView()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:16px;line-height:1">&#x2715;</span>
+          </div>
+          <select id="searchAnioSelect" onchange="renderBusquedaFromControls()" style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px">
             <option value="">Todos los años</option>
           </select>
-          <select id="searchMesSelect" onchange="renderBusquedaFromControls()" style="min-width:150px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px">
+          <select id="searchMesSelect" onchange="renderBusquedaFromControls()" style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px">
             <option value="">Todos los meses</option>
           </select>
-          <button class="xl-btn" onclick="clearSearch()" style="color:var(--text2)">✕ Cerrar búsqueda</button>
+          <button class="xl-btn" onclick="clearSearch()" style="color:var(--text2)">&#x2715; Cerrar</button>
         </div>
       </div>
       <div id="searchResults" style="padding:0 0 32px"></div>
@@ -6888,6 +6900,26 @@
       }, 180);
     }
 
+    function buscarEventosView(query) {
+      const btn = document.getElementById('searchViewClearBtn');
+      if (btn) btn.style.display = query ? 'inline' : 'none';
+      // Keep sidebar input in sync
+      const sideInput = document.getElementById('searchInput');
+      if (sideInput && sideInput.value !== query) sideInput.value = query;
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(() => { renderBusqueda(query.trim()); }, 180);
+    }
+
+    function clearSearchView() {
+      const viewInput = document.getElementById('searchInputView');
+      if (viewInput) viewInput.value = '';
+      const btn = document.getElementById('searchViewClearBtn');
+      if (btn) btn.style.display = 'none';
+      const sideInput = document.getElementById('searchInput');
+      if (sideInput) sideInput.value = '';
+      renderBusqueda('');
+    }
+
     function clearSearch() {
       const input = document.getElementById('searchInput');
       if (input) input.value = '';
@@ -6927,8 +6959,10 @@
 
     function renderBusquedaFromControls() {
       renderSearchFilterOptions();
-      const input = document.getElementById('searchInput');
-      renderBusqueda((input?.value || '').trim());
+      const sideInput  = document.getElementById('searchInput');
+      const viewInput  = document.getElementById('searchInputView');
+      const q = (viewInput?.value || sideInput?.value || '').trim();
+      renderBusqueda(q);
     }
 
     function showSearchView() {
@@ -6939,6 +6973,15 @@
       const vSearch = document.getElementById('view-search');
       if (vSearch) vSearch.style.display = 'block';
       window.scrollTo(0, 0);
+      // Populate filters and show all events when entering the view
+      renderSearchFilterOptions();
+      const viewInput = document.getElementById('searchInputView');
+      const sideInput = document.getElementById('searchInput');
+      if (viewInput && sideInput) viewInput.value = sideInput.value;
+      const q = (viewInput?.value || sideInput?.value || '').trim();
+      if (document.getElementById('searchResults')?.children.length === 0) {
+        renderBusqueda(q); // render immediately when view opens
+      }
 
       document.querySelectorAll('.nav-item').forEach(el => {
         const txt = (el.textContent || '').toLowerCase();
@@ -7016,14 +7059,8 @@
       const container = document.getElementById('searchResults');
       if (!container) return;
 
-      if (!q && !filters.anio && !filters.mes) {
-        container.innerHTML = `
-          <div class="panel" style="text-align:center;padding:42px 24px;color:var(--text3)">
-            <div style="font-size:16px;font-weight:700;color:var(--text2);margin-bottom:8px">Búsqueda ordenada por período</div>
-            <div>Usa el selector de año, el selector de mes o escribe en el buscador lateral para encontrar registros.</div>
-          </div>`;
-        return;
-      }
+      // When no query and no filters, fall through and show ALL events
+      // (browse mode — no early return)
 
       if (resultados.length === 0) {
         container.innerHTML = `
