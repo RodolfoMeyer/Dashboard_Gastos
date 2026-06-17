@@ -6753,14 +6753,33 @@
       // Cerrar modal
       document.getElementById('modalEliminarMes').classList.remove('open');
 
-      // Guardar INMEDIATAMENTE (no con debounce) para asegurar persistencia
+      // Guardar en localStorage inmediatamente
       xlSaveNow();
       if (typeof xlRenderTabs === 'function') xlRenderTabs();
       if (typeof xlRenderGrid === 'function') xlRenderGrid();
       renderDashboard();
       renderPeriodos();
       if (typeof renderChart === 'function') renderChart();
-      showToast(`✓ Mes "${label}" eliminado`);
+      showToast(`✓ Mes "${label}" eliminado — sincronizando con nube…`);
+
+      // Eliminar de Supabase inmediatamente (no debounce).
+      // Si no se hace aquí, el refresh restaura el mes desde la nube.
+      if (_sb && _currentUser) {
+        const uid = _currentUser.id;
+        Promise.all([
+          _sb.from('gastos').delete().match({ user_id: uid, mes_clave: mes }),
+          _sb.from('meses').delete().match({ user_id: uid, clave: mes })
+        ]).then(([gRes, mRes]) => {
+          if (gRes.error || mRes.error) {
+            console.error('[EliminarMes] Error al borrar de nube:', gRes.error || mRes.error);
+            showToast(`⚠ Mes eliminado localmente — error en nube, intenta de nuevo`);
+          } else {
+            showToast(`☁ Mes "${label}" eliminado de la nube`);
+          }
+        }).catch(e => {
+          console.error('[EliminarMes] Error inesperado:', e.message);
+        });
+      }
     }
 
     // ── Inyectar botones Limpiar y Eliminar Mes en toolbar ──
