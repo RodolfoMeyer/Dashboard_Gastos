@@ -1983,6 +1983,7 @@
             <button class="xl-btn" onclick="respaldarDatos()" title="Backup total (JSON)" style="color:var(--green)">⬇ Respaldar</button>
             <button class="xl-btn" onclick="document.getElementById('inputCargarRespaldo').click()" title="Cargar Backup (JSON)" style="color:var(--accent)">⬆ Cargar</button>
             <button class="xl-btn" onclick="xlShowLocalBackupsModal()" title="Ver respaldos automaticos guardados localmente" style="color:var(--blue,#5b8cdc)">🗂 Respaldos</button>
+            <button class="xl-btn" onclick="xlShowCloudBackupsModal()" title="Restaurar backup desde Supabase o servidor local" style="color:#e67e22">🔄 Restaurar</button>
           </div>
         </div>
 
@@ -4981,6 +4982,197 @@
       }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  BACKUP AUTOMATICO A LAS 00:00 (local + Supabase snapshot)
+    // ═══════════════════════════════════════════════════════════
+    const _BACKUP_SERVER = 'http://127.0.0.1:7432';
+
+    function xlInitMidnightBackup() {
+      const now  = new Date();
+      const next = new Date(now);
+      next.setHours(24, 0, 5, 0);   // 00:00:05 del día siguiente
+      const ms   = next - now;
+      setTimeout(() => {
+        xlMidnightBackupTick();
+        setInterval(xlMidnightBackupTick, 24 * 60 * 60 * 1000);
+      }, ms);
+      console.log('[Backup 00:00] Próximo backup:', next.toLocaleString('es-CL'));
+    }
+
+    async function xlMidnightBackupTick() {
+      if (!_sb || !_currentUser) return;
+      const today = new Date().toISOString().slice(0, 10);
+      console.log('[Backup 00:00] Iniciando backup diario', today);
+
+      // 1. Forzar sync de datos en vivo a Supabase
+      xlForceSyncNow();
+
+      // 2. Snapshot inmutable en tabla backups de Supabase
+      await xlSaveSupabaseSnapshot(today);
+
+      // 3. Archivo JSON en disco vía servidor local (silencioso si no está corriendo)
+      await xlWriteLocalBackupViaServer(today);
+
+      xlSaveLocalBackup('midnight');
+      showToast('☁ Backup diario completado — ' + today);
+      console.log('[Backup 00:00] Completado OK');
+    }
+
+    async function xlSaveSupabaseSnapshot(fecha) {
+      try {
+        // Asegurar xlData tiene todos los meses
+        MESES_ORDEN.forEach(mes => {
+          if (!xlData[mes] || !xlData[mes].length) {
+            const ev = DATA_MESES[mes]?.eventos || [];
+            if (ev.length) xlData[mes] = ev.map(e => ({...e}));
+          }
+        });
+        const payload = _buildRespaldo('supabase-midnight');
+        const rowCount = Object.values(xlData).reduce((s, a) => s + (a?.length || 0), 0);
+
+        const { error } = await _sb.from('backups').upsert({
+          user_id:   _currentUser.id,
+          fecha,
+          data:      payload,
+          mes_count: MESES_ORDEN.length,
+          row_count: rowCount
+        }, { onConflict: 'user_id,fecha' });
+        if (error) throw error;
+
+        // Retención: borrar backups de más de 30 días
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 30);
+        await _sb.from('backups').delete()
+          .eq('user_id', _currentUser.id)
+          .lt('fecha', cutoff.toISOString().slice(0, 10));
+
+        console.log('[Backup] Snapshot Supabase OK —', rowCount, 'filas,', MESES_ORDEN.length, 'meses');
+      } catch(e) {
+        console.error('[Backup] Error snapshot Supabase:', e.message);
+      }
+    }
+
+    async function xlWriteLocalBackupViaServer(fecha) {
+      try {
+        const payload = _buildRespaldo('local-midnight');
+        const res = await fetch(_BACKUP_SERVER + '/backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fecha, data: payload })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const r = await res.json();
+        console.log('[Backup] Archivo local OK —', r.file);
+      } catch(e) {
+        // Servidor no activo → silencioso (cloud backup sigue funcionando)
+        console.warn('[Backup] Servidor local no disponible (solo cloud):', e.message);
+      }
+    }
+
+    // ── Restaurar desde Supabase o servidor local ────────────────
+
+    async function xlShowCloudBackupsModal() {
+      if (!_sb || !_currentUser) { showToast('⚠ Sin sesión activa'); return; }
+
+      let supabaseList = [], localList = [];
+
+      // Cargar lista de Supabase
+      try {
+        const { data, error } = await _sb.from('backups')
+          .select('fecha, timestamp, mes_count, row_count')
+          .eq('user_id', _currentUser.id)
+          .order('fecha', { ascending: false })
+          .limit(30);
+        if (!error && data) supabaseList = data;
+      } catch(e) { console.warn('[Restore] Error cargando lista Supabase:', e.message); }
+
+      // Cargar lista del servidor local (silencioso si no está)
+      try {
+        const res = await fetch(_BACKUP_SERVER + '/list', { signal: AbortSignal.timeout(2000) });
+        const r   = await res.json();
+        if (r.ok) localList = r.backups;
+      } catch(e) { /* servidor no disponible */ }
+
+      // Construir modal
+      let modal = document.getElementById('cloudBackupModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'cloudBackupModal';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:3000;display:flex;align-items:center;justify-content:center';
+        modal.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
+        document.body.appendChild(modal);
+      }
+
+      const sbRows = supabaseList.length
+        ? supabaseList.map(b => {
+            const dt = new Date(b.timestamp).toLocaleString('es-CL');
+            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+              <div style="flex:1">
+                <div style="font-weight:600;font-size:13px">☁ ${b.fecha}</div>
+                <div style="font-size:11px;color:var(--ink2)">${dt} · ${b.mes_count} meses · ${b.row_count} filas</div>
+              </div>
+              <button onclick="xlRestoreFromSupabase('${b.fecha}')"
+                style="background:var(--accent);color:#111;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700">Restaurar</button>
+            </div>`;
+          }).join('')
+        : '<div style="color:var(--ink2);font-size:13px;padding:12px 0">Sin backups en Supabase</div>';
+
+      const lcRows = localList.length
+        ? localList.map(b => `
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+              <div style="flex:1">
+                <div style="font-weight:600;font-size:13px">💾 ${b.fecha}</div>
+                <div style="font-size:11px;color:var(--ink2)">${b.archivo} · ${b.size_kb} KB</div>
+              </div>
+              <button onclick="xlRestoreFromLocalServer('${b.fecha}')"
+                style="background:var(--surface2,#2a2a2a);color:var(--ink1);border:1px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700">Restaurar</button>
+            </div>`).join('')
+        : '<div style="color:var(--ink2);font-size:13px;padding:12px 0">Servidor local no disponible o sin backups</div>';
+
+      modal.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;width:520px;max-width:94vw;max-height:80vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div style="font-size:16px;font-weight:700">☁ Restaurar Backup</div>
+          <button onclick="document.getElementById('cloudBackupModal').style.display='none'"
+            style="background:none;border:none;color:var(--ink2);font-size:22px;cursor:pointer">✕</button>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:8px">SUPABASE (nube)</div>
+        ${sbRows}
+        <div style="font-size:12px;font-weight:700;color:var(--ink2);margin:16px 0 8px">SERVIDOR LOCAL</div>
+        ${lcRows}
+        <div style="margin-top:16px;font-size:11px;color:var(--ink3,#666)">Los backups en nube se conservan 30 días. El servidor local requiere que backup-server.js esté corriendo.</div>
+      </div>`;
+      modal.style.display = 'flex';
+    }
+
+    async function xlRestoreFromSupabase(fecha) {
+      if (!_sb || !_currentUser) return;
+      if (!confirm(`¿Restaurar backup del ${fecha}? Se sobreescribirán los datos actuales.`)) return;
+      try {
+        const { data, error } = await _sb.from('backups')
+          .select('data').eq('user_id', _currentUser.id).eq('fecha', fecha).single();
+        if (error || !data) throw new Error('No encontrado');
+        document.getElementById('cloudBackupModal').style.display = 'none';
+        _applyRespaldo(data.data);
+        showToast('✓ Restaurado desde Supabase — ' + fecha);
+      } catch(e) {
+        showToast('❌ Error restaurando: ' + e.message);
+      }
+    }
+
+    async function xlRestoreFromLocalServer(fecha) {
+      if (!confirm(`¿Restaurar backup local del ${fecha}? Se sobreescribirán los datos actuales.`)) return;
+      try {
+        const res = await fetch(`${_BACKUP_SERVER}/restore?fecha=${fecha}`);
+        const r   = await res.json();
+        if (!r.ok) throw new Error(r.error);
+        document.getElementById('cloudBackupModal').style.display = 'none';
+        _applyRespaldo(r.data);
+        showToast('✓ Restaurado desde archivo local — ' + fecha);
+      } catch(e) {
+        showToast('❌ Error restaurando desde local: ' + e.message);
+      }
+    }
+
     function _applyRespaldo(respaldo) {
       if (!respaldo.xlData || !respaldo.mesesOrden) {
         showToast('Error: respaldo invalido'); return false;
@@ -6226,6 +6418,7 @@
         _cloudRestoreComplete = true;
         xlSaveLocalBackup('login');
         xlCheckDailyBackup();
+        xlInitMidnightBackup();
         // Subir a nube:
         // a) Nube estaba vacia => subir todo (recuperacion completa)
         // b) Habia meses en local ausentes en nube => subir solo esos (recuperacion parcial)
