@@ -6287,6 +6287,8 @@
 
         // 2. Gastos: SOLO procesar meses que fueron cargados en esta sesión.
         //    Si xlData[mes] === undefined, el mes no fue cargado → NO borrar cloud.
+        //    save_month_gastos() ejecuta DELETE+INSERT dentro de una sola transacción
+        //    en el servidor → si falla, el servidor hace rollback y los datos quedan intactos.
         for (const mes of dirtyMeses) {
           if (!Object.prototype.hasOwnProperty.call(xlData, mes)) {
             skipped.push(mes); // re-encolar para próximo intento
@@ -6295,28 +6297,27 @@
           const rows = (xlData[mes] || []).map(r => {
             const mm = (r.fecha||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
             return {
-              user_id: userId, mes_clave: mes,
               fecha: r.fecha||'', fecha_iso: mm ? `${mm[3]}-${mm[2]}-${mm[1]}` : null,
               evento: r.evento||'', funcion: r.funcion||'',
               desayuno: r.desayuno||0, viatico: r.viatico||0, trasnoche: r.trasnoche||0,
               parking: r.parking||0, combustible: r.combustible||0, bodega: r.bodega||0
             };
           });
-          // SAFE SAVE: write pre-save marker BEFORE delete.
-          // If app dies between delete and insert, next startup recovers from this.
+          // Pre-save marker: si el RPC falla en vuelo, el próximo inicio rescata desde acá.
           const _presaveKey = 'toled_presave_' + mes;
           try {
             localStorage.setItem(_presaveKey, JSON.stringify({
               ts: Date.now(), mes, rows: xlData[mes] || []
             }));
-          } catch(e) { /* localStorage full — continue anyway */ }
-          const { error: dErr } = await _sb.from('gastos').delete().match({ user_id: userId, mes_clave: mes });
-          if (dErr) throw dErr;
-          if (rows.length > 0) {
-            const { error: iErr } = await _sb.from('gastos').insert(rows);
-            if (iErr) throw iErr;
-          }
-          // Insert succeeded — clear the pre-save marker
+          } catch(e) { /* localStorage lleno — continuar igual */ }
+          // Guardado atómico en servidor: DELETE + INSERT en una transacción
+          const { error: rpcErr } = await _sb.rpc('save_month_gastos', {
+            p_user_id: userId,
+            p_mes_clave: mes,
+            p_rows: rows
+          });
+          if (rpcErr) throw rpcErr;
+          // RPC exitoso — limpiar marcador
           try { localStorage.removeItem('toled_presave_' + mes); } catch(e) {}
         }
 
