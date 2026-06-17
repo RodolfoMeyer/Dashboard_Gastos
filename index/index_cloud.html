@@ -1979,6 +1979,7 @@
         <div class="xl-toolbar-group">
           <div class="xl-toolbar-group-label">Sincronización y Backup</div>
           <div class="xl-toolbar-actions">
+            <button class="xl-btn" onclick="xlForceSyncNow()" title="Forzar sincronización con la nube ahora" style="color:#3b9eff">☁ Sincronizar</button>
             <button class="xl-btn" onclick="respaldarDatos()" title="Backup total (JSON)" style="color:var(--green)">⬇ Respaldar</button>
             <button class="xl-btn" onclick="document.getElementById('inputCargarRespaldo').click()" title="Cargar Backup (JSON)" style="color:var(--accent)">⬆ Cargar</button>
             <button class="xl-btn" onclick="xlShowLocalBackupsModal()" title="Ver respaldos automaticos guardados localmente" style="color:var(--blue,#5b8cdc)">🗂 Respaldos</button>
@@ -6396,6 +6397,19 @@
       // Guardar inmediatamente sin debounce (usado en blur y beforeunload)
       clearTimeout(_saveTimer);
       xlPersist();
+    }
+
+    function xlForceSyncNow() {
+      // Marcar todos los meses cargados como sucios y subir a nube inmediatamente
+      if (!_sb || !_currentUser) {
+        showToast('⚠️ Sin sesión activa — inicia sesión para sincronizar');
+        return;
+      }
+      Object.keys(xlData).forEach(m => _cloudDirtyMes.add(m));
+      clearTimeout(_cloudSaveTimer);
+      clearTimeout(_cloudRetryTimer);
+      xlPersistCloud();
+      showToast('☁ Sincronizando con la nube…');
     }
 
     // ── Guardar TODO en localStorage ──
