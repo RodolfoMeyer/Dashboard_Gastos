@@ -6157,12 +6157,42 @@
       if (btn) btn.style.display = show ? 'none' : 'block';
     }
 
+    // ── Seguridad: rate limiting, validación, sanitización ──────
+    const _RL_LIMITS = { login: 5, signup: 3, reset: 3 };
+    const _RL_WINDOW = 15 * 60 * 1000;
+
+    function _rlCheck(action) {
+      const key = 'toled_rl_' + action;
+      const now = Date.now();
+      const log = JSON.parse(localStorage.getItem(key) || '[]')
+                    .filter(t => now - t < _RL_WINDOW);
+      if (log.length >= _RL_LIMITS[action]) {
+        const wait = Math.ceil((_RL_WINDOW - (now - log[0])) / 60000);
+        return `Demasiados intentos. Espera ${wait} min e inténtalo de nuevo.`;
+      }
+      log.push(now);
+      localStorage.setItem(key, JSON.stringify(log));
+      return null;
+    }
+
+    function _validateEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    }
+
+    function _sanitizeStr(v, maxLen = 200) {
+      return String(v || '').trim().slice(0, maxLen);
+    }
+    // ─────────────────────────────────────────────────────────────
+
     async function handleLoginSubmit() {
       const email = document.getElementById('loginEmail').value.trim();
       const pass  = document.getElementById('loginPass').value.trim();
       const msg   = document.getElementById('authMsg');
       const btn   = document.getElementById('loginBtn');
       if (!email || !pass) { msg.style.color='#f87171'; msg.textContent='Completa email y contraseña'; return; }
+      if (!_validateEmail(email)) { msg.style.color='#f87171'; msg.textContent='Email inválido'; return; }
+      const rl = _rlCheck('login');
+      if (rl) { msg.style.color='#f87171'; msg.textContent=rl; return; }
       btn.disabled = true; btn.textContent = 'Conectando...'; msg.textContent = '';
       const { data, error } = await supabaseLogin(email, pass);
       if (error) {
@@ -6235,8 +6265,11 @@
       const btn    = document.getElementById('regBtn');
       msg.textContent = '';
       if (!nombre || !email || !pass) { msg.style.color='#f87171'; msg.textContent='Completa todos los campos'; return; }
-      if (pass.length < 6) { msg.style.color='#f87171'; msg.textContent='La contraseña debe tener al menos 6 caracteres'; return; }
+      if (!_validateEmail(email)) { msg.style.color='#f87171'; msg.textContent='Email inválido'; return; }
+      if (pass.length < 8) { msg.style.color='#f87171'; msg.textContent='La contraseña debe tener al menos 8 caracteres'; return; }
       if (pass !== pass2) { msg.style.color='#f87171'; msg.textContent='Las contraseñas no coinciden'; return; }
+      const rl = _rlCheck('signup');
+      if (rl) { msg.style.color='#f87171'; msg.textContent=rl; return; }
       btn.disabled = true; btn.textContent = 'Creando cuenta...';
       const { data, error } = await _sb.auth.signUp({
         email, password: pass,
@@ -6261,9 +6294,12 @@
       const msg   = document.getElementById('authMsg');
       const btn   = document.getElementById('forgotBtn');
       if (!email) { msg.style.color='#f87171'; msg.textContent='Ingresa tu email'; return; }
+      if (!_validateEmail(email)) { msg.style.color='#f87171'; msg.textContent='Email inválido'; return; }
+      const rl = _rlCheck('reset');
+      if (rl) { msg.style.color='#f87171'; msg.textContent=rl; return; }
       btn.disabled = true; btn.textContent = 'Enviando...';
       const { error } = await _sb.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.href.split('#')[0]
+        redirectTo: 'https://toled-gastos.vercel.app'
       });
       btn.disabled = false; btn.textContent = 'Enviar enlace';
       if (error) { msg.style.color='#f87171'; msg.textContent = error.message; return; }
@@ -6276,7 +6312,7 @@
       const pass2 = document.getElementById('resetPass2').value;
       const msg   = document.getElementById('authMsg');
       const btn   = document.getElementById('resetBtn');
-      if (pass.length < 6) { msg.style.color='#f87171'; msg.textContent='La contraseña debe tener al menos 6 caracteres'; return; }
+      if (pass.length < 8) { msg.style.color='#f87171'; msg.textContent='La contraseña debe tener al menos 8 caracteres'; return; }
       if (pass !== pass2) { msg.style.color='#f87171'; msg.textContent='Las contraseñas no coinciden'; return; }
       btn.disabled = true; btn.textContent = 'Guardando...';
       const { error } = await _sb.auth.updateUser({ password: pass });
@@ -6492,9 +6528,13 @@
             const mm = (r.fecha||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
             return {
               fecha: r.fecha||'', fecha_iso: mm ? `${mm[3]}-${mm[2]}-${mm[1]}` : null,
-              evento: r.evento||'', funcion: r.funcion||'',
-              desayuno: r.desayuno||0, viatico: r.viatico||0, trasnoche: r.trasnoche||0,
-              parking: r.parking||0, combustible: r.combustible||0, bodega: r.bodega||0
+              evento: _sanitizeStr(r.evento, 200), funcion: _sanitizeStr(r.funcion, 200),
+              desayuno:    Math.max(0, parseInt(r.desayuno)    || 0),
+              viatico:     Math.max(0, parseInt(r.viatico)     || 0),
+              trasnoche:   Math.max(0, parseInt(r.trasnoche)   || 0),
+              parking:     Math.max(0, parseInt(r.parking)     || 0),
+              combustible: Math.max(0, parseInt(r.combustible) || 0),
+              bodega:      Math.max(0, parseInt(r.bodega)      || 0)
             };
           });
           // Pre-save marker: si el RPC falla en vuelo, el próximo inicio rescata desde acá.
@@ -6518,7 +6558,7 @@
         // 3. Transferencias completas
         const transfRows = transferencias.map(t => ({
           user_id: userId, mes_clave: t.mes, fecha: t.fecha||'',
-          concepto: t.concepto||'', monto: t.monto||0, tipo: t.tipo
+          concepto: _sanitizeStr(t.concepto, 200), monto: Math.max(0, parseInt(t.monto) || 0), tipo: t.tipo
         }));
         const { error: tDelErr } = await _sb.from('transferencias').delete().eq('user_id', userId);
         if (tDelErr) throw tDelErr;
